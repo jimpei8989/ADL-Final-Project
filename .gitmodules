@@ -1,0 +1,6 @@
+[submodule "libs/trippy-public"]
+	path = libs/trippy-public
+	url = https://gitlab.cs.uni-duesseldorf.de/general/dsml/trippy-public.git
+[submodule "libs/dialoglue"]
+	path = libs/dialoglue
+	url = https://github.com/alexa/dialoglue.git
