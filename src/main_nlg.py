@@ -8,9 +8,9 @@ def parse_args() -> Namespace:
     parser = ArgumentParser()
 
     # file PATH
-    parser.add_argument("--train_data", default="./dataset/data/train")
-    parser.add_argument("--val_data", default="./dataset/data/dev")
-    parser.add_argument("--test_data", default="./dataset/data/test_seen")
+    parser.add_argument("--train_data", type=Path, default="./dataset/data/train")
+    parser.add_argument("--val_data", type=Path, default="./dataset/data/dev")
+    parser.add_argument("--test_data", type=Path, default="./dataset/data/test_seen")
     parser.add_argument(
         "--ckpt_dir",
         type=Path,
