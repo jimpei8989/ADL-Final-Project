@@ -10,7 +10,7 @@ class DSTDataset(Dataset):
         self, json_dir: Path, schema_file: Path, tokenizer=None, max_seq_length=512
     ) -> None:
         self.root = json_dir
-        self.file_names = os.listdir(json_dir)
+        self.file_names = sorted(os.listdir(json_dir))
         self.data = []
         self.schema_file = json.load(open(schema_file, "r"))
         for fname in tqdm(self.file_names):
@@ -29,5 +29,5 @@ class DSTDataset(Dataset):
 
 if __name__ == "__main__":
     dataset = DSTDataset(
-        Path("dataset/data-0610/train"), Path("dataset/data/schema.json")
+        Path("dataset/data-0610/new-train"), Path("dataset/data/schema.json")
     )
