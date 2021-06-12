@@ -5,3 +5,7 @@
 dataset/
 seen_empty_submission.csv
 state_to_csv.py
+
+# pycache
+src/*/__pycache__
+src/__pycache__
