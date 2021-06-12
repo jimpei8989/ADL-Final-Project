@@ -50,11 +50,11 @@ class DSTDatasetForNLG(DSTDataset):
 
 
 if __name__ == "__main__":
-    d1 = DSTDatasetForNLG(
-        Path("dataset/data/train"), Path("dataset/data/schema.json"), mode="train"
-    )
-    d2 = DSTDatasetForNLG(
-        Path("dataset/data/train"), Path("dataset/data/schema.json"), mode="test"
-    )
+    for paths in ["train", "dev", "test_seen", "test_unseen"]:
+        ds = DSTDatasetForNLG(
+            Path("dataset/data") / paths,
+            Path("dataset/data/schema.json"),
+            mode=("test" if "test" in paths else "train"),
+        )
 
-    print(len(d1), len(d2))
+        print(paths, len(ds))
