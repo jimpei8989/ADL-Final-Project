@@ -34,7 +34,7 @@ def generate(model, dataset, batch_size, device):
                 {
                     "dialogue_ids": idx,
                     "user": u,
-                    "begin": b.strip(),
+                    "beginning": b.strip(),
                     "system": s,
                     "end": e.strip(),
                 }
