@@ -1,6 +1,8 @@
-from dataset import DSTDataset
+from datasets.dataset import DSTDataset
 from pathlib import Path
 from typing import Iterable, Tuple
+from torch.nn.utils.rnn import pad_sequence
+import torch
 
 
 def pairwise(iterable: Iterable) -> Iterable[Tuple]:
@@ -12,12 +14,11 @@ class DSTDatasetForNLG(DSTDataset):
     def __init__(
         self,
         json_dir: Path,
-        schema_file: Path,
         tokenizer=None,
         max_seq_length=512,
         mode="test",
     ) -> None:
-        super().__init__(json_dir, schema_file, tokenizer, max_seq_length)
+        super().__init__(json_dir, tokenizer, max_seq_length)
         self.nlg_data = []
 
         for d in self.data:
@@ -47,6 +48,37 @@ class DSTDatasetForNLG(DSTDataset):
 
     def __len__(self):
         return len(self.nlg_data)
+
+    def collate_fn_gen_begin(self, datas):
+        ret = pad_sequence(
+            [
+                torch.LongTensor(self.tokenizer.encode(d["user_utterance"]))
+                for d in datas
+            ],
+            batch_first=True,
+        )
+        return {
+            "dialogue_ids": [f"{d['dialogue_id']}_{d['turns_id'][0]}" for d in datas],
+            "str": [d["user_utterance"] for d in datas],
+            "input_ids": ret,
+        }
+
+    def collate_fn_gen_end(self, datas):
+        ret = pad_sequence(
+            [
+                torch.LongTensor(
+                    self.tokenizer.encode(d["user_utterance"])
+                    + self.tokenizer.encode(d["system_utterance"])
+                )
+                for d in datas
+            ],
+            batch_first=True,
+        )
+        return {
+            "dialogue_ids": [f"{d['dialogue_id']}_{d['turns_id'][1]}" for d in datas],
+            "str": [d["system_utterance"] for d in datas],
+            "input_ids": ret,
+        }
 
 
 if __name__ == "__main__":

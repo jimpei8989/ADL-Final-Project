@@ -27,4 +27,6 @@ class DSTDataset(Dataset):
 
 
 if __name__ == "__main__":
-    dataset = DSTDataset(Path("dataset/data-0610/new-train"), Path("dataset/data/schema.json"))
+    dataset = DSTDataset(
+        Path("dataset/data-0610/new-train"), Path("dataset/data/schema.json")
+    )
