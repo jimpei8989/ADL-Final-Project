@@ -9,3 +9,7 @@ state_to_csv.py
 # Pycache
 *.pyc
 __pycache__/
+
+# model
+models/
+ckpt/
