@@ -43,7 +43,7 @@ class DSTDatasetForNLG(DSTDataset):
                 self.nlg_data.append(tmp)
 
     def __getitem__(self, index):
-        pass
+        return self.nlg_data[index]
 
     def __len__(self):
         return len(self.nlg_data)
