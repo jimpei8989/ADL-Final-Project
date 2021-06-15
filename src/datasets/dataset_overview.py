@@ -46,7 +46,7 @@ class DSTDatasetForOverview(DSTDataset):
             + "\n".join(
                 map(
                     lambda p: f"{p[0]:20s} [{p[1]}]",
-                    sorted(service_count.items(), key=lambda p: p[1], reverse=True),
+                    sorted(service_count.items(), key=lambda p: (-p[1], p[0])),
                 )
             )
         )
@@ -60,8 +60,7 @@ class DSTDatasetForOverview(DSTDataset):
                         filter(
                             lambda p: service_count[p[0].split("--")[0]] != 0, slot_count.items()
                         ),
-                        key=lambda p: p[1],
-                        reverse=True,
+                        key=lambda p: (-p[1], p[0]),
                     ),
                 ),
             )
