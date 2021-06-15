@@ -66,7 +66,10 @@ class DSTDatasetForNLG(DSTDataset):
     def collate_fn_gen_end(self, datas):
         ret = pad_sequence(
             [
-                torch.LongTensor(self.tokenizer.encode(d["system_utterance"]))
+                torch.LongTensor(
+                    self.tokenizer.encode(d["user_utterance"])
+                    + self.tokenizer.encode(d["system_utterance"])
+                )
                 for d in datas
             ],
             batch_first=True,

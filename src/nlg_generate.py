@@ -46,5 +46,6 @@ def generate(model, dataset, batch_size, device):
                     end_sentences,
                 )
             ]
+            # return result
 
     return result
