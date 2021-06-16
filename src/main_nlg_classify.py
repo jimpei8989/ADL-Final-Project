@@ -16,7 +16,7 @@ DEV = "val"
 SPLITS = [TRAIN, DEV]
 
 
-def iter_loop(dataloader, model, loss_fn, optimizer, device, mode):
+def iter_loop(dataloader, model, optimizer, accumulate_steps, device, mode):
     total_correct = 0
     total_loss = 0
     cnt = 0
@@ -26,11 +26,14 @@ def iter_loop(dataloader, model, loss_fn, optimizer, device, mode):
     elif mode == DEV:
         model.eval()
 
+    step = 0
     with torch.set_grad_enabled(mode == TRAIN):
         with tqdmm(dataloader, unit="batch") as tepoch:
+            optimizer.zero_grad()
             for data in tepoch:
                 tepoch.set_description(f"[{mode:>5}]")
 
+                step += 1
                 token = data["input_ids"].to(device)
                 label = data["labels"].to(device)
 
@@ -47,9 +50,10 @@ def iter_loop(dataloader, model, loss_fn, optimizer, device, mode):
                 total_loss += loss
 
                 if mode == TRAIN:
-                    optimizer.zero_grad()
-                    loss.backward()
-                    optimizer.step()
+                    (loss / accumulate_steps).backward()
+                    if step % accumulate_steps == 0:
+                        optimizer.step()
+                        optimizer.zero_grad()
 
                 tepoch.set_postfix(loss=f"{loss.item():>.4f}", Acc=f"{correct:>.4f}")
 
@@ -95,7 +99,6 @@ def main(args):
         optimizer, min_lr=1e-7, patience=5
     )
 
-    loss_fn = torch.torch.nn.BCELoss()
     max_acc, min_loss = 0, 100
     early_stop = 0
 
@@ -107,8 +110,8 @@ def main(args):
 
     for epoch in range(args.num_epoch):
         print(f"Epoch: {epoch + 1}")
-        iter_loop(dataloaders[TRAIN], model, loss_fn, optimizer, device, TRAIN)
-        acc, loss = iter_loop(dataloaders[DEV], model, loss_fn, optimizer, device, DEV)
+        iter_loop(dataloaders[TRAIN], model, optimizer, args.accumulate_steps, device, TRAIN)
+        acc, loss = iter_loop(dataloaders[DEV], model, optimizer, args.accumulate_steps, device, DEV)
 
         scheduler.step(loss)
 
@@ -160,9 +163,10 @@ def parse_args() -> Namespace:
 
     # train
     parser.add_argument("--lr", type=float, default=1e-5)
-    parser.add_argument("--weight_decay", type=float, default=1e-5)
+    parser.add_argument("--weight_decay", type=float, default=1e-6)
     parser.add_argument("--backbone", type=str, default="./models/convbert")
     parser.add_argument("--num_epoch", type=int, default=100)
+    parser.add_argument("--accumulate_steps", type=int, default=8)
 
     # Misc
     parser.add_argument("--gpu", default="0")

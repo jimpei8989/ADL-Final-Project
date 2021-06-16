@@ -60,7 +60,8 @@ class DSTDatasetForNLG(DSTDataset):
         label = []
         for sample in samples:
             idx = self.nlg_data.index(sample)
-            utterance = sample["system_utterance"]
+            system_utterance = sample["system_utterance"]
+            user_utterance = sample["user_utterance"]
             chitchat_map = {
                 chat["candidate"]: [chat["label"], 0] for chat in sample["beginning"]
             }
@@ -72,10 +73,13 @@ class DSTDatasetForNLG(DSTDataset):
                 random.randint(0, len(chitchat_map) - 1)
             ]
             sentence = (
-                "".join([chitchat, utterance][:: (-1) ** chitchat_map[chitchat][1]])
+                user_utterance
+                + self.tokenizer.sep_token
+                + "".join(
+                    [chitchat, system_utterance][:: (-1) ** chitchat_map[chitchat][1]]
+                )
                 + self.tokenizer.sep_token
             )
-            sentence += sample["user_utterance"] + self.tokenizer.sep_token
 
             for dialog in self.history[: self.history_map[idx]]:
                 if len(sentence) > 1024:
