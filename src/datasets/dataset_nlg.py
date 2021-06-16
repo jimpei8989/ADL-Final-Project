@@ -18,11 +18,13 @@ class DSTDatasetForNLG(DSTDataset):
         tokenizer=None,
         max_seq_length=512,
         mode="test",
+        get_full_history=False,
     ) -> None:
         super().__init__(json_dir, tokenizer, max_seq_length)
         self.nlg_data = []
         self.history = []
         self.history_map = {}
+        self.get_full_history = (get_full_history,)
 
         for d in self.data:
             for idx, (user, system) in enumerate(pairwise(d["turns"])):
