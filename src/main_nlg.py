@@ -50,21 +50,14 @@ def parse_args() -> Namespace:
 
 def main(args):
     if args.train:
-        tokenizer = BlenderbotTokenizer.from_pretrained(args.pretrained)
-        model = BlenderbotForConditionalGeneration.from_pretrained(args.pretrained)
-        for data in [args.train_data, args.val_data]:
-            logger.info(data)
-            dataset = DSTDatasetForNLG(data, tokenizer=tokenizer, mode="test")
-
-            result = generate(
-                model, dataset, batch_size=args.batch_size, device=args.device
-            )
-
+        pass
     if args.predict:
         tokenizer = BlenderbotTokenizer.from_pretrained(args.pretrained)
         model = BlenderbotForConditionalGeneration.from_pretrained(args.pretrained)
 
-        dataset = DSTDatasetForNLG(args.test_data, tokenizer=tokenizer, mode="test")
+        dataset = DSTDatasetForNLG(
+            args.test_data, tokenizer=tokenizer, mode="test", get_full_history=True
+        )
 
         result = generate(
             model, dataset, batch_size=args.batch_size, device=args.device

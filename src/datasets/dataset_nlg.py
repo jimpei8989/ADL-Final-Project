@@ -2,6 +2,7 @@ from datasets.dataset import DSTDataset
 from pathlib import Path
 from typing import Iterable, Tuple
 import random
+import copy
 
 import torch
 from torch.nn.utils.rnn import pad_sequence
@@ -12,12 +13,38 @@ def pairwise(iterable: Iterable) -> Iterable[Tuple]:
     return zip(*[iter(iterable)] * 2)
 
 
+def gen_input_sentence(data, domain, max_len, tokenizer):
+    cur_data = data[-1] if type(data) is list else data
+
+    ret = []
+    if domain == "begin":
+        ret_before_tok = [cur_data["user_utterance"]]
+    elif domain == "end":
+        ret_before_tok = [cur_data["user_utterance"], cur_data["system_utterance"]]
+
+    for d in ret_before_tok:
+        ret += tokenizer.encode(d)
+
+    # Add previous history
+    if type(data) is list:
+        for i in range(-2, -len(data) - 1, -1):
+            tmp = tokenizer.encode(data[i]["user_utterance"]) + tokenizer.encode(
+                data[i]["system_utterance"]
+            )
+            if len(tmp) + len(ret) < max_len:
+                ret = tmp + ret
+            else:
+                break
+
+    return torch.LongTensor(ret)
+
+
 class DSTDatasetForNLG(DSTDataset):
     def __init__(
         self,
         json_dir: Path,
         tokenizer=None,
-        max_seq_length=512,
+        max_seq_length=128,
         mode="test",
         get_full_history=False,
     ) -> None:
@@ -54,12 +81,11 @@ class DSTDatasetForNLG(DSTDataset):
 
     def __getitem__(self, index):
         if self.get_full_history:
-            tmp = self.nlg_data[index]
             history_idx = self.history_map[index]
-            tmp["history"] = self.history[
-                history_idx - tmp["turns_id"][0] // 2 : history_idx
+            return self.history[
+                history_idx - self.nlg_data[index]["turns_id"][0] // 2 : history_idx + 1
             ]
-            return tmp
+
         else:
             return self.nlg_data[index]
 
@@ -69,11 +95,18 @@ class DSTDatasetForNLG(DSTDataset):
     def collate_fn_gen_begin(self, datas):
         ret = pad_sequence(
             [
-                torch.LongTensor(self.tokenizer.encode(d["user_utterance"]))
+                gen_input_sentence(
+                    d,
+                    domain="begin",
+                    max_len=self.max_seq_length,
+                    tokenizer=self.tokenizer,
+                )
                 for d in datas
             ],
             batch_first=True,
         )
+        if type(datas) is list:
+            datas = datas[0]
         return {
             "dialogue_ids": [f"{d['dialogue_id']}_{d['turns_id'][0]}" for d in datas],
             "str": [d["user_utterance"] for d in datas],
@@ -83,14 +116,18 @@ class DSTDatasetForNLG(DSTDataset):
     def collate_fn_gen_end(self, datas):
         ret = pad_sequence(
             [
-                torch.LongTensor(
-                    self.tokenizer.encode(d["user_utterance"])
-                    + self.tokenizer.encode(d["system_utterance"])
+                gen_input_sentence(
+                    d,
+                    domain="end",
+                    max_len=self.max_seq_length,
+                    tokenizer=self.tokenizer,
                 )
                 for d in datas
             ],
             batch_first=True,
         )
+        if type(datas) is list:
+            datas = datas[0]
         return {
             "dialogue_ids": [f"{d['dialogue_id']}_{d['turns_id'][1]}" for d in datas],
             "str": [d["system_utterance"] for d in datas],
