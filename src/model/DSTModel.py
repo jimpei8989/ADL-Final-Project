@@ -2,7 +2,7 @@ import pickle
 from typing import Dict
 
 import torch
-from torch.nn import BCELoss, CrossEntropyLoss
+from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss
 
 from transformers import AutoModel, AutoConfig
 
@@ -25,9 +25,8 @@ class DSTModel(torch.nn.Module):
 
         self.cls_fc = torch.nn.Linear(self.backbone.config.hidden_size, 2)
         self.span_fc = torch.nn.Linear(self.backbone.config.hidden_size, 2)
-        self.sigmoid = torch.nn.Sigmoid()
 
-        self.cls_criterion = BCELoss()
+        self.cls_criterion = BCEWithLogitsLoss()
         self.span_criterion = CrossEntropyLoss()
 
     def forward(
@@ -36,7 +35,6 @@ class DSTModel(torch.nn.Module):
         last_hidden_states = self.backbone(input_ids)["last_hidden_state"]
 
         cls_logits = self.fc(last_hidden_states[:, 0])
-        cls_logits = self.sigmoid(cls_logits)
         slot_logits = cls_logits[:, 0]
         value_logits = cls_logits[:, 1]
 
