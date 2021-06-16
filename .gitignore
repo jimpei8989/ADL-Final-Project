@@ -3,6 +3,7 @@
 
 # dataset
 dataset/
+data*
 seen_empty_submission.csv
 state_to_csv.py
 

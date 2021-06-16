@@ -11,6 +11,10 @@ class Slot:
     is_categorical: bool
     possible_values: List[str] = field(default_factory=list)
 
+    def __post_init__(self):
+        if self.is_categorical:
+            assert len(self.possible_values) > 0
+
     @property
     def num_possible_values(self):
         return len(self.possible_values)

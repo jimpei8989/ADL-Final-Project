@@ -40,6 +40,7 @@ def main(args):
             path,
             mode="train",
             tokenizer=tokenizer,
+            get_full_history=True,
         )
         for split, path in zip(SPLITS, [args.train_data, args.val_data])
     }
@@ -86,9 +87,9 @@ def parse_args() -> Namespace:
 
     # file PATH
     parser.add_argument(
-        "--train_data", type=Path, default="./dataset/data-0610/new-train"
+        "--train_data", type=Path, default="./dataset/data-0614/train"
     )
-    parser.add_argument("--val_data", type=Path, default="./dataset/data-0610/new-dev")
+    parser.add_argument("--val_data", type=Path, default="./dataset/data-0614/dev")
     parser.add_argument("--test_data", type=Path, default="./dataset/data/test_seen")
     parser.add_argument(
         "--ckpt_dir",
