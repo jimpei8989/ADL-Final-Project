@@ -4,6 +4,7 @@ from typing import Iterable, Tuple
 import random
 
 import torch
+from torch.nn.utils.rnn import pad_sequence
 
 
 def pairwise(iterable: Iterable) -> Iterable[Tuple]:
@@ -52,10 +53,49 @@ class DSTDatasetForNLG(DSTDataset):
                 self.nlg_data.append(tmp)
 
     def __getitem__(self, index):
-        return self.nlg_data[index]
+        if self.get_full_history:
+            tmp = self.nlg_data[index]
+            history_idx = self.history_map[index]
+            tmp["history"] = self.history[
+                history_idx - tmp["turns_id"][0] // 2 : history_idx
+            ]
+            return tmp
+        else:
+            return self.nlg_data[index]
 
     def __len__(self):
         return len(self.nlg_data)
+
+    def collate_fn_gen_begin(self, datas):
+        ret = pad_sequence(
+            [
+                torch.LongTensor(self.tokenizer.encode(d["user_utterance"]))
+                for d in datas
+            ],
+            batch_first=True,
+        )
+        return {
+            "dialogue_ids": [f"{d['dialogue_id']}_{d['turns_id'][0]}" for d in datas],
+            "str": [d["user_utterance"] for d in datas],
+            "input_ids": ret,
+        }
+
+    def collate_fn_gen_end(self, datas):
+        ret = pad_sequence(
+            [
+                torch.LongTensor(
+                    self.tokenizer.encode(d["user_utterance"])
+                    + self.tokenizer.encode(d["system_utterance"])
+                )
+                for d in datas
+            ],
+            batch_first=True,
+        )
+        return {
+            "dialogue_ids": [f"{d['dialogue_id']}_{d['turns_id'][1]}" for d in datas],
+            "str": [d["system_utterance"] for d in datas],
+            "input_ids": ret,
+        }
 
     def classify_collate_fn(self, samples):
         input_ids = []
