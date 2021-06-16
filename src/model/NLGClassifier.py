@@ -33,9 +33,9 @@ class NLGClassifier(torch.nn.Module):
         x = self.backbone(input_ids=input_ids)["last_hidden_state"][:, 0]
 
         x = self.fc(x)
-        x = self.sigmoid(x)
+        # x = self.sigmoid(x)
 
         pred = x.view(-1)
-        loss = torch.nn.BCELoss()(pred, labels)
+        loss = torch.nn.BCEWithLogitsLoss()(pred, labels)
 
         return NLGClassifyOutput(loss=loss, logits=pred)

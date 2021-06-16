@@ -27,14 +27,14 @@ SPLITS = [TRAIN, DEV]
 def compute_metric(eval_pred):
     preds, labels = eval_pred
 
-    score = ((preds > 0.5).type(torch.float) == labels).type(torch.float).mean().item()
+    score = ((preds > 0.5) == labels).mean()
     return {"acc": score}
 
 
 def main(args):
+    set_seed(args.seed)
     tokenizer = AutoTokenizer.from_pretrained(args.backbone)
 
-    device = torch.device(f"cuda:{args.gpu}")
     datasets = {
         split: DSTDatasetForNLG(
             path,
@@ -44,7 +44,7 @@ def main(args):
         for split, path in zip(SPLITS, [args.train_data, args.val_data])
     }
 
-    model = NLGClassifier(model_name=args.backbone).to(device)
+    model = NLGClassifier(model_name=args.backbone)
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
     train_args = TrainingArguments(
@@ -72,6 +72,7 @@ def main(args):
         train_args,
         train_dataset=datasets[TRAIN],
         eval_dataset=datasets[DEV],
+        data_collator=datasets[TRAIN].classify_collate_fn,
         tokenizer=tokenizer,
         compute_metrics=compute_metric,
         callbacks=callback_list,
