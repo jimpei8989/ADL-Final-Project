@@ -21,7 +21,8 @@ def gen_input_sentence(data, domain, max_len, tokenizer):
     if domain == "begin":
         ret_before_tok = [cur_data["user_utterance"]]
     elif domain == "end":
-        ret_before_tok = [cur_data["user_utterance"], cur_data["system_utterance"]]
+        # ret_before_tok = [cur_data["user_utterance"], cur_data["system_utterance"]]
+        ret_before_tok = [cur_data["user_utterance"] + cur_data["system_utterance"]]
 
     for d in ret_before_tok:
         ret += tokenizer.encode(d, truncation=True, max_length=max_len - len(ret))
@@ -53,7 +54,7 @@ class DSTDatasetForNLG(DSTDataset):
         self.nlg_data = []
         self.history = []
         self.history_map = {}
-        self.get_full_history = (get_full_history,)
+        self.get_full_history = get_full_history
 
         for d in self.data:
             for idx, (user, system) in enumerate(pairwise(d["turns"])):

@@ -36,6 +36,9 @@ def parse_args() -> Namespace:
 
     # dataloader
     parser.add_argument("--batch_size", type=int, default=8)
+    parser.add_argument(
+        "--history", help="Whether use history or not", action="store_true"
+    )
 
     # Misc
     parser.add_argument("--gpu", default="0")
@@ -56,7 +59,10 @@ def main(args):
         model = BlenderbotForConditionalGeneration.from_pretrained(args.pretrained)
 
         dataset = DSTDatasetForNLG(
-            args.test_data, tokenizer=tokenizer, mode="test", get_full_history=True
+            args.test_data,
+            tokenizer=tokenizer,
+            mode="test",
+            get_full_history=args.history,
         )
 
         result = generate(
