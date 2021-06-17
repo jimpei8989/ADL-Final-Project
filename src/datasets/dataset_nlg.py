@@ -1,3 +1,4 @@
+from os import truncate
 from datasets.dataset import DSTDataset
 from pathlib import Path
 from typing import Iterable, Tuple
@@ -23,7 +24,7 @@ def gen_input_sentence(data, domain, max_len, tokenizer):
         ret_before_tok = [cur_data["user_utterance"], cur_data["system_utterance"]]
 
     for d in ret_before_tok:
-        ret += tokenizer.encode(d)
+        ret += tokenizer.encode(d, truncation=True, max_length=max_len - len(ret))
 
     # Add previous history
     if type(data) is list:
@@ -83,7 +84,9 @@ class DSTDatasetForNLG(DSTDataset):
         if self.get_full_history:
             history_idx = self.history_map[index]
             return self.history[
-                history_idx - self.nlg_data[index]["turns_id"][0] // 2 : history_idx + 1
+                (
+                    history_idx - (self.nlg_data[index]["turns_id"][0] // 2) - 1
+                ) : history_idx
             ]
 
         else:
@@ -106,7 +109,7 @@ class DSTDatasetForNLG(DSTDataset):
             batch_first=True,
         )
         if type(datas) is list:
-            datas = datas[0]
+            datas = datas[-1]
         return {
             "dialogue_ids": [f"{d['dialogue_id']}_{d['turns_id'][0]}" for d in datas],
             "str": [d["user_utterance"] for d in datas],
@@ -127,7 +130,7 @@ class DSTDatasetForNLG(DSTDataset):
             batch_first=True,
         )
         if type(datas) is list:
-            datas = datas[0]
+            datas = datas[-1]
         return {
             "dialogue_ids": [f"{d['dialogue_id']}_{d['turns_id'][1]}" for d in datas],
             "str": [d["system_utterance"] for d in datas],
