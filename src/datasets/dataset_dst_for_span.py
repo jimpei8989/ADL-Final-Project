@@ -3,10 +3,9 @@ import random
 from datasets.dataset_dst import DSTDatasetForDST
 
 
-class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
-    def __init__(self, *args, negative_ratio=1.0, **kwargs):
+class DSTDatasetForDSTForSpan(DSTDatasetForDST):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.negative_ratio = negative_ratio
 
     def __len__(self):
         return super().__len__()
@@ -18,34 +17,26 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
         candidates = [
             (service, slot)
             for service, slot in self.get_positive_service_slot_names(dialogue["turns"][turn_idx])
-            if self.schema.service_by_name[service].slot_by_name[slot].is_categorical
+            if not self.schema.service_by_name[service].slot_by_name[slot].is_categorical
         ]
 
         chosen_idx = int(random.random() * len(candidates))
         service_name, slot_name = candidates[chosen_idx]
 
         slot = self.schema.service_by_name[service_name].slot_by_name[slot_name]
-
         the_frame = next(filter(lambda f: f["service"] == service_name, turn["frames"]))
-        correct_answer = the_frame["state"]["slot_values"][slot_name][0]
+        the_slot = next(filter(lambda s: s["slot"] == slot_name, the_frame["slots"]))
 
-        positive = int(random.random() * (1 + self.negative_ratio) < 1.0)
-        if positive:
-            value = correct_answer
-        else:
-            incorrect_answers = [v for v in slot.possible_values if v != correct_answer]
-            if len(incorrect_answers) == 0:
-                print(slot.possible_values)
-            value = incorrect_answers[int(random.random() * len(incorrect_answers))]
+        begin_str_idx, end_str_idx = the_slot["start"], the_slot["exclusive_end"]
 
-        slot_tokens = (
-            self.tokenizer.tokenize(slot.description)
-            + [self.tokenizer.sep_token]
-            + self.tokenizer.tokenize(value)
-        )
+        slot_tokens = self.tokenizer.tokenize(slot.description)
 
-        utterance = self.get_utterance_tokens(
-            dialogue, turn_idx, max_length=self.max_seq_length - len(slot_tokens) - 2
+        utterance, begin_token_idx, end_token_idx = self.get_utterance_tokens(
+            dialogue,
+            turn_idx,
+            max_length=self.max_seq_length - len(slot_tokens) - 2,
+            begin_str_idx=begin_str_idx,
+            end_str_idx=end_str_idx - 1,
         )
 
         input_ids = self.tokenizer(utterance, slot_tokens, is_split_into_words=True)
@@ -53,7 +44,9 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
         return {
             "type": 0,
             "input_ids": input_ids,
-            "label": positive,
+            # adds the begining [CLS] back
+            "begin_token_idx": begin_token_idx + 1,
+            "end_token_idx": end_token_idx + 1,
         }
 
 
@@ -64,7 +57,7 @@ if __name__ == "__main__":
 
     schema = Schema.load_json(Path("../dataset/data/schema.json"))
     tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-    dataset = DSTDatasetForDSTForCategorical(
+    dataset = DSTDatasetForDSTForSpan(
         Path("../dataset/data-0614/train"),
         schema=schema,
         tokenizer=tokenizer,
@@ -74,3 +67,4 @@ if __name__ == "__main__":
 
     print(len(dataset))
     print(dataset[0])
+    print(dataset[42])
