@@ -30,8 +30,11 @@ def gen_input_sentence(data, domain, max_len, tokenizer):
     # Add previous history
     if type(data) is list:
         for i in range(-2, -len(data) - 1, -1):
-            tmp = tokenizer.encode(data[i]["user_utterance"]) + tokenizer.encode(
-                data[i]["system_utterance"]
+            # tmp = tokenizer.encode(data[i]["user_utterance"]) + tokenizer.encode(
+            #     data[i]["system_utterance"]
+            # )
+            tmp = tokenizer.encode(
+                data[i]["user_utterance"] + data[i]["system_utterance"]
             )
             if len(tmp) + len(ret) < max_len:
                 ret = tmp + ret
