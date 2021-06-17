@@ -13,13 +13,14 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
 
     def __getitem__(self, index: int):
         dialogue, turn_idx = super().__getitem__(index)
+        turn = dialogue["turns"][turn_idx]
 
         positive = int(random.random() * (1 + self.negative_ratio) < 1.0)
 
         candidates = (
-            self.get_positive_service_slot_names(dialogue["turns"][turn_idx])
+            self.get_positive_service_slot_names(turn)
             if positive
-            else self.get_negative_slots(dialogue, dialogue["turns"][turn_idx])
+            else self.get_negative_slots(dialogue, turn)
         )
 
         slot_idx = int(random.random() * len(candidates))
