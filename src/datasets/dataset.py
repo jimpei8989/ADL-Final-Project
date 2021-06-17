@@ -1,14 +1,21 @@
 import json
 import os
 from pathlib import Path
+from typing import Optional
 
 from torch.utils.data import Dataset
+from transformers import PreTrainedTokenizerBase
 
 from utils.tqdmm import tqdmm
 
 
 class DSTDataset(Dataset):
-    def __init__(self, json_dir: Path, tokenizer=None, max_seq_length=512) -> None:
+    def __init__(
+        self,
+        json_dir: Path,
+        tokenizer: Optional[PreTrainedTokenizerBase] = None,
+        max_seq_length: int = 512,
+    ) -> None:
         self.root = json_dir
         self.file_names = sorted(os.listdir(json_dir))
         self.data = []
