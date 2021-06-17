@@ -108,8 +108,9 @@ class DSTDatasetForNLG(DSTDataset):
             ],
             batch_first=True,
         )
-        if type(datas) is list:
-            datas = datas[-1]
+        if type(datas[0]) is list:
+            datas = [d[-1] for d in datas]
+
         return {
             "dialogue_ids": [f"{d['dialogue_id']}_{d['turns_id'][0]}" for d in datas],
             "str": [d["user_utterance"] for d in datas],
@@ -129,8 +130,9 @@ class DSTDatasetForNLG(DSTDataset):
             ],
             batch_first=True,
         )
-        if type(datas) is list:
-            datas = datas[-1]
+        if type(datas[0]) is list:
+            datas = [d[-1] for d in datas]
+
         return {
             "dialogue_ids": [f"{d['dialogue_id']}_{d['turns_id'][1]}" for d in datas],
             "str": [d["system_utterance"] for d in datas],
