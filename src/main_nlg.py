@@ -2,12 +2,16 @@ from argparse import ArgumentParser, Namespace
 import json
 import torch
 
-from torch.utils.data import DataLoader
 from nlg_generate import generate
 from utils.logger import logger
 from pathlib import Path
 from utils.utils import set_seed
-from transformers import BlenderbotTokenizer, BlenderbotForConditionalGeneration
+from transformers import (
+    AutoTokenizer,
+    BlenderbotForConditionalGeneration,
+    AutoModelForCausalLM,
+    AutoModelForSeq2SeqLM,
+)
 from datasets.dataset_nlg import DSTDatasetForNLG
 
 
@@ -55,8 +59,17 @@ def main(args):
     if args.train:
         pass
     if args.predict:
-        tokenizer = BlenderbotTokenizer.from_pretrained(args.pretrained)
-        model = BlenderbotForConditionalGeneration.from_pretrained(args.pretrained)
+        tokenizer = AutoTokenizer.from_pretrained(args.pretrained)
+        if tokenizer.pad_token_id is None:
+            tokenizer.pad_token = tokenizer.eos_token
+
+        if "blenderbot" in args.pretrained:
+            model = BlenderbotForConditionalGeneration.from_pretrained(args.pretrained)
+        elif "gpt" in args.pretrained:
+            model = AutoModelForCausalLM.from_pretrained(args.pretrained)
+        else:
+            model = AutoModelForSeq2SeqLM.from_pretrained(args.pretrained)
+        logger.info(model.config)
 
         dataset = DSTDatasetForNLG(
             args.test_data,

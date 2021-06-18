@@ -3,7 +3,6 @@ from datasets.dataset import DSTDataset
 from pathlib import Path
 from typing import Iterable, Tuple
 import random
-import copy
 
 import torch
 from torch.nn.utils.rnn import pad_sequence
@@ -23,6 +22,8 @@ def gen_input_sentence(data, domain, max_len, tokenizer):
     elif domain == "end":
         # ret_before_tok = [cur_data["user_utterance"], cur_data["system_utterance"]]
         ret_before_tok = [cur_data["user_utterance"] + cur_data["system_utterance"]]
+    if "t5" in tokenizer.name_or_path:
+        ret_before_tok[0] = "generate: " + ret_before_tok[0]
 
     for d in ret_before_tok:
         ret += tokenizer.encode(d, truncation=True, max_length=max_len - len(ret))

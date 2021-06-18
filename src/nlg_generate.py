@@ -24,11 +24,19 @@ def generate(model, dataset, batch_size, device):
         for data_begin, data_end in tqdmm(
             zip(loader_begin, loader_end), total=len(loader_begin)
         ):
-            begin = model.generate(data_begin["input_ids"].to(device), num_beams=10)
+            begin = model.generate(
+                data_begin["input_ids"].to(device), num_beams=10, max_length=128
+            )
             begin_sentences = tokenizer.batch_decode(begin, skip_special_tokens=True)
 
-            end = model.generate(data_end["input_ids"].to(device), num_beams=10)
+            end = model.generate(
+                data_end["input_ids"].to(device), num_beams=10, max_length=128
+            )
             end_sentences = tokenizer.batch_decode(end, skip_special_tokens=True)
+
+            if "gpt2" in model.config._name_or_path:
+                begin_sentences = [s.rstrip("!") for s in begin_sentences]
+                end_sentences = [s.rstrip("!") for s in end_sentences]
 
             result += [
                 {
