@@ -57,3 +57,28 @@ def generate(model, dataset, batch_size, device):
             # return result
 
     return result
+
+
+def generate_end(model, loader: DataLoader, tokenizer, device):
+    model.to(device)
+    with torch.no_grad():
+        result = []
+        for data in tqdmm(loader):
+            end = model.generate(
+                data["input_ids"].to(device), num_beams=10, max_length=128
+            )
+            end_sentences = tokenizer.batch_decode(end, skip_special_tokens=True)
+
+            result += [
+                {
+                    "dialogue_ids": idx,
+                    "user": u,
+                    "system": s,
+                    "end": e.strip(),
+                }
+                for idx, u, s, e in zip(
+                    data["dialogue_ids"], data["user"], data["system"], end_sentences
+                )
+            ]
+
+        return result

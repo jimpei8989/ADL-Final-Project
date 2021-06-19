@@ -1,18 +1,25 @@
 from argparse import ArgumentParser, Namespace
+import os
 import json
 import torch
-
-from nlg_generate import generate
-from utils.logger import logger
+from torch.utils.data import DataLoader
 from pathlib import Path
-from utils.utils import set_seed
 from transformers import (
     AutoTokenizer,
     BlenderbotForConditionalGeneration,
     AutoModelForCausalLM,
     AutoModelForSeq2SeqLM,
+    DataCollatorForSeq2Seq,
+    Seq2SeqTrainingArguments,
+    Seq2SeqTrainer,
+    EarlyStoppingCallback,
 )
 from datasets.dataset_nlg import DSTDatasetForNLG
+from datasets.dataset_nlg_end import DSTDatasetForNLGEnd
+from utils.utils import metrics, set_seed
+from datasets.dataset_nlg_end import DSTDatasetForNLGEnd
+from nlg_generate import generate, generate_end
+from utils.logger import logger
 
 
 def parse_args() -> Namespace:
@@ -33,7 +40,9 @@ def parse_args() -> Namespace:
 
     # mode
     parser.add_argument("--train", action="store_true")
+    parser.add_argument("--train_end", action="store_true")
     parser.add_argument("--predict", action="store_true")
+    parser.add_argument("--predict_end", action="store_true")
 
     # model
     parser.add_argument("--pretrained", default="facebook/blenderbot-400M-distill")
@@ -44,11 +53,16 @@ def parse_args() -> Namespace:
         "--history", help="Whether use history or not", action="store_true"
     )
 
+    # trainer
+    parser.add_argument("--wd", type=float, default=1e-5)
+    parser.add_argument("--num_epoch", type=int, default=100)
+
     # Misc
     parser.add_argument("--gpu", default="0")
     parser.add_argument("--seed", default=24667429)
     args = parser.parse_args()
-    args.device = torch.device(f"cuda:{args.gpu}")
+    args.device = torch.device("cuda")
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
     logger.info(args)
     set_seed(args.seed)
@@ -58,10 +72,78 @@ def parse_args() -> Namespace:
 def main(args):
     if args.train:
         pass
+
+    if args.train_end:
+        tokenizer = AutoTokenizer.from_pretrained(args.pretrained)
+        if "blenderbot" in args.pretrained:
+            model = BlenderbotForConditionalGeneration.from_pretrained(args.pretrained)
+        else:
+            model = AutoModelForSeq2SeqLM.from_pretrained(args.pretrained)
+        logger.info(model.config)
+
+        train_data = DSTDatasetForNLGEnd(
+            args.train_data,
+            tokenizer=tokenizer,
+            mode="train",
+            get_full_history=False,
+        )
+        val_data = DSTDatasetForNLGEnd(
+            args.val_data,
+            tokenizer=tokenizer,
+            mode="train",
+            get_full_history=False,
+        )
+        collator = DataCollatorForSeq2Seq(tokenizer, model=model)
+        train_args = Seq2SeqTrainingArguments(
+            args.ckpt_dir,
+            evaluation_strategy="epoch",
+            logging_strategy="epoch",
+            save_strategy="epoch",
+            adafactor=True,
+            per_device_train_batch_size=args.batch_size,
+            per_device_eval_batch_size=args.batch_size,
+            weight_decay=args.wd,
+            num_train_epochs=args.num_epoch,
+            predict_with_generate=True,
+            fp16=True,
+            gradient_accumulation_steps=8,
+            load_best_model_at_end=True,
+            save_total_limit=5,
+        )
+        trainer = Seq2SeqTrainer(
+            model,
+            train_args,
+            train_dataset=train_data,
+            eval_dataset=val_data,
+            data_collator=DataCollatorForSeq2Seq(tokenizer, model=model),
+            tokenizer=tokenizer,
+            compute_metrics=metrics(tokenizer),
+            callbacks=[EarlyStoppingCallback(3)],
+        )
+        trainer.train()
+
+    if args.predict_end:
+        tokenizer = AutoTokenizer.from_pretrained(args.ckpt_dir, local_files_only=True)
+        model = AutoModelForSeq2SeqLM.from_pretrained(
+            args.ckpt_dir, local_files_only=True
+        )
+        test_data = DSTDatasetForNLGEnd(
+            args.test_data,
+            tokenizer=tokenizer,
+            mode="test",
+            get_full_history=False,
+        )
+        test_loader = DataLoader(
+            test_data,
+            shuffle=False,
+            batch_size=args.batch_size,
+            collate_fn=test_data.collate_fn,
+        )
+        result = generate_end(model, test_loader, tokenizer, device=args.device)
+        json.dump(result, open(args.opt_file, "w"))
+
     if args.predict:
         tokenizer = AutoTokenizer.from_pretrained(args.pretrained)
-        if tokenizer.pad_token_id is None:
-            tokenizer.pad_token = tokenizer.eos_token
 
         if "blenderbot" in args.pretrained:
             model = BlenderbotForConditionalGeneration.from_pretrained(args.pretrained)

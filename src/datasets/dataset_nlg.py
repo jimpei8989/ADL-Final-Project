@@ -1,4 +1,3 @@
-from os import truncate
 from datasets.dataset import DSTDataset
 from pathlib import Path
 from typing import Iterable, Tuple
@@ -20,8 +19,8 @@ def gen_input_sentence(data, domain, max_len, tokenizer):
     if domain == "begin":
         ret_before_tok = [cur_data["user_utterance"]]
     elif domain == "end":
-        # ret_before_tok = [cur_data["user_utterance"], cur_data["system_utterance"]]
-        ret_before_tok = [cur_data["user_utterance"] + cur_data["system_utterance"]]
+        ret_before_tok = [cur_data["user_utterance"], cur_data["system_utterance"]]
+        # ret_before_tok = [cur_data["user_utterance"] + cur_data["system_utterance"]]
     if "t5" in tokenizer.name_or_path:
         ret_before_tok[0] = "generate: " + ret_before_tok[0]
 
@@ -31,12 +30,12 @@ def gen_input_sentence(data, domain, max_len, tokenizer):
     # Add previous history
     if type(data) is list:
         for i in range(-2, -len(data) - 1, -1):
-            # tmp = tokenizer.encode(data[i]["user_utterance"]) + tokenizer.encode(
-            #     data[i]["system_utterance"]
-            # )
-            tmp = tokenizer.encode(
-                data[i]["user_utterance"] + data[i]["system_utterance"]
+            tmp = tokenizer.encode(data[i]["user_utterance"]) + tokenizer.encode(
+                data[i]["system_utterance"]
             )
+            # tmp = tokenizer.encode(
+            #     data[i]["user_utterance"] + data[i]["system_utterance"]
+            # )
             if len(tmp) + len(ret) < max_len:
                 ret = tmp + ret
             else:
