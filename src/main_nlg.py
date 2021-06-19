@@ -18,7 +18,7 @@ from datasets.dataset_nlg import DSTDatasetForNLG
 from datasets.dataset_nlg_end import DSTDatasetForNLGEnd
 from utils.utils import metrics, set_seed
 from datasets.dataset_nlg_end import DSTDatasetForNLGEnd
-from nlg_generate import generate, generate_end
+from nlg_generate import generate, generate_oneside
 from utils.logger import logger
 
 
@@ -40,8 +40,10 @@ def parse_args() -> Namespace:
 
     # mode
     parser.add_argument("--train", action="store_true")
+    parser.add_argument("--train_begin", action="store_true")
     parser.add_argument("--train_end", action="store_true")
     parser.add_argument("--predict", action="store_true")
+    parser.add_argument("--predict_begin", action="store_true")
     parser.add_argument("--predict_end", action="store_true")
 
     # model
@@ -73,7 +75,8 @@ def main(args):
     if args.train:
         pass
 
-    if args.train_end:
+    if args.train_end ^ args.train_begin:
+        which_side = "end" if args.train_end else "beginning"
         tokenizer = AutoTokenizer.from_pretrained(args.pretrained)
         if "blenderbot" in args.pretrained:
             model = BlenderbotForConditionalGeneration.from_pretrained(args.pretrained)
@@ -86,12 +89,14 @@ def main(args):
             tokenizer=tokenizer,
             mode="train",
             get_full_history=False,
+            which_side=which_side,
         )
         val_data = DSTDatasetForNLGEnd(
             args.val_data,
             tokenizer=tokenizer,
             mode="train",
             get_full_history=False,
+            which_side=which_side,
         )
         collator = DataCollatorForSeq2Seq(tokenizer, model=model)
         train_args = Seq2SeqTrainingArguments(
@@ -122,7 +127,8 @@ def main(args):
         )
         trainer.train()
 
-    if args.predict_end:
+    if args.predict_end ^ args.predict_begin:
+        which_side = "end" if args.predict_end else "beginning"
         tokenizer = AutoTokenizer.from_pretrained(args.ckpt_dir, local_files_only=True)
         model = AutoModelForSeq2SeqLM.from_pretrained(
             args.ckpt_dir, local_files_only=True
@@ -132,6 +138,7 @@ def main(args):
             tokenizer=tokenizer,
             mode="test",
             get_full_history=False,
+            which_side=which_side,
         )
         test_loader = DataLoader(
             test_data,
@@ -139,7 +146,7 @@ def main(args):
             batch_size=args.batch_size,
             collate_fn=test_data.collate_fn,
         )
-        result = generate_end(model, test_loader, tokenizer, device=args.device)
+        result = generate_oneside(model, test_loader, tokenizer, device=args.device)
         json.dump(result, open(args.opt_file, "w"))
 
     if args.predict:
