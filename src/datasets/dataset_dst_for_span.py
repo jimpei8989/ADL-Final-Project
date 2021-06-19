@@ -34,17 +34,18 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
         utterance, begin_token_idx, end_token_idx = self.get_utterance_tokens(
             dialogue,
             turn_idx,
-            max_length=self.max_seq_length - len(slot_tokens) - 2,
+            max_length=self.max_seq_length - len(slot_tokens) - 3,
             begin_str_idx=begin_str_idx,
             end_str_idx=end_str_idx - 1,
         )
 
-        input_ids = self.tokenizer(utterance, slot_tokens, is_split_into_words=True)
+        input_ids = self.tokenizer(
+            utterance, slot_tokens, is_split_into_words=True, padding="max_length"
+        ).input_ids
 
         return {
-            "type": 0,
+            "type": 2,
             "input_ids": input_ids,
-            # adds the begining [CLS] back
             "begin_token_idx": begin_token_idx + 1,
             "end_token_idx": end_token_idx + 1,
         }

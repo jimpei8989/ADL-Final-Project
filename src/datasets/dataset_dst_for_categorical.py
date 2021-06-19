@@ -17,7 +17,7 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
 
         candidates = [
             (service, slot)
-            for service, slot in self.get_positive_service_slot_names(dialogue["turns"][turn_idx])
+            for service, slot in self.get_positive_service_slot_names(turn)
             if self.schema.service_by_name[service].slot_by_name[slot].is_categorical
         ]
 
@@ -45,13 +45,15 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
         )
 
         utterance = self.get_utterance_tokens(
-            dialogue, turn_idx, max_length=self.max_seq_length - len(slot_tokens) - 2
+            dialogue, turn_idx, max_length=self.max_seq_length - len(slot_tokens) - 3
         )
 
-        input_ids = self.tokenizer(utterance, slot_tokens, is_split_into_words=True)
+        input_ids = self.tokenizer(
+            utterance, slot_tokens, is_split_into_words=True, padding="max_length"
+        ).input_ids
 
         return {
-            "type": 0,
+            "type": 1,
             "input_ids": input_ids,
             "label": positive,
         }
