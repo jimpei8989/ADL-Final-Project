@@ -53,9 +53,7 @@ class DSTDatasetForDST(DSTDataset):
 
         self.valid_indices = self.sanity_check()
 
-        logger.info(
-            f"Finished filtering bad samples, there're {len(self)} user turns left..."
-        )
+        logger.info(f"Finished filtering bad samples, there're {len(self)} user turns left...")
 
     def sanity_check(self) -> List[int]:
         self.sanity_check_on = True
@@ -121,12 +119,18 @@ class DSTDatasetForDST(DSTDataset):
         else:
             return sum(tokens[::-1], [])
 
-    def get_positive_service_slot_names(self, turn) -> List[Tuple[str, str]]:
-        return [
-            (frame["service"], slot)
-            for frame in turn["frames"]
-            for slot in frame["state"]["slot_values"]
-        ]
+    def get_positive_service_slot_names(self, turn, filter_slots=False) -> List[Tuple[str, str]]:
+        ret = []
+
+        for frame in turn["frames"]:
+            # NOTE: some slots has no "start" and "exclusive_end", possibly due to its value
+            # was referenced from other slots
+            in_slots = {s["slot"] for s in frame["slots"] if "start" in s and "exclusive_end" in s}
+            for slot in frame["state"]["slot_values"]:
+                if not filter_slots or slot in in_slots:
+                    ret.append((frame["service"], slot))
+
+        return ret
 
     def get_all_service_slot_names(self, dialogue) -> List[Tuple[str, str]]:
         return [

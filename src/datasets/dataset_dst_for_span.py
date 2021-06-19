@@ -1,5 +1,7 @@
 import random
 
+import torch
+
 from datasets.dataset_dst import DSTDatasetForDST
 
 
@@ -16,12 +18,11 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
 
         candidates = [
             (service, slot)
-            for service, slot in self.get_positive_service_slot_names(dialogue["turns"][turn_idx])
+            for service, slot in self.get_positive_service_slot_names(turn, True)
             if not self.schema.service_by_name[service].slot_by_name[slot].is_categorical
         ]
 
         assert len(candidates) > 0
-
 
     def __getitem__(self, index: int):
         dialogue, turn_idx = super().__getitem__(index)
@@ -29,19 +30,19 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
 
         candidates = [
             (service, slot)
-            for service, slot in self.get_positive_service_slot_names(dialogue["turns"][turn_idx])
+            for service, slot in self.get_positive_service_slot_names(turn, True)
             if not self.schema.service_by_name[service].slot_by_name[slot].is_categorical
         ]
 
         chosen_idx = int(random.random() * len(candidates))
         service_name, slot_name = candidates[chosen_idx]
 
-        slot = self.schema.service_by_name[service_name].slot_by_name[slot_name]
         the_frame = next(filter(lambda f: f["service"] == service_name, turn["frames"]))
         the_slot = next(filter(lambda s: s["slot"] == slot_name, the_frame["slots"]))
 
         begin_str_idx, end_str_idx = the_slot["start"], the_slot["exclusive_end"]
 
+        slot = self.schema.service_by_name[service_name].slot_by_name[slot_name]
         slot_tokens = self.tokenizer.tokenize(slot.description)
 
         utterance, begin_token_idx, end_token_idx = self.get_utterance_tokens(
@@ -58,7 +59,7 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
 
         return {
             "type": 2,
-            "input_ids": input_ids,
+            "input_ids": torch.as_tensor(input_ids, dtype=torch.long),
             "begin_token_idx": begin_token_idx + 1,
             "end_token_idx": end_token_idx + 1,
         }

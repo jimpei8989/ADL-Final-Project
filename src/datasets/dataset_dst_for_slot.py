@@ -1,5 +1,7 @@
 import random
 
+import torch
+
 from datasets.dataset_dst import DSTDatasetForDST
 
 
@@ -48,7 +50,7 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
 
         return {
             "type": 0,
-            "input_ids": input_ids,
+            "input_ids": torch.as_tensor(input_ids, dtype=torch.long),
             "label": positive,
         }
 

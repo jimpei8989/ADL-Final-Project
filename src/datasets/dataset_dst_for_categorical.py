@@ -1,5 +1,7 @@
 import random
 
+import torch
+
 from datasets.dataset_dst import DSTDatasetForDST
 
 
@@ -22,7 +24,6 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
         ]
 
         assert len(candidates) > 0
-
 
     def __getitem__(self, index: int):
         dialogue, turn_idx = super().__getitem__(index)
@@ -67,7 +68,7 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
 
         return {
             "type": 1,
-            "input_ids": input_ids,
+            "input_ids": torch.as_tensor(input_ids, dtype=torch.long),
             "label": positive,
         }
 
