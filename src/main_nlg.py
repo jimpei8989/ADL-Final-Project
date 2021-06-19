@@ -98,7 +98,6 @@ def main(args):
             get_full_history=False,
             which_side=which_side,
         )
-        collator = DataCollatorForSeq2Seq(tokenizer, model=model)
         train_args = Seq2SeqTrainingArguments(
             args.ckpt_dir,
             evaluation_strategy="epoch",
@@ -146,7 +145,9 @@ def main(args):
             batch_size=args.batch_size,
             collate_fn=test_data.collate_fn,
         )
-        result = generate_oneside(model, test_loader, tokenizer, device=args.device)
+        result = generate_oneside(
+            model, test_loader, tokenizer, device=args.device, which_side=which_side
+        )
         json.dump(result, open(args.opt_file, "w"))
 
     if args.predict:
