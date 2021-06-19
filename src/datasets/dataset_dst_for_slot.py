@@ -5,11 +5,21 @@ from datasets.dataset_dst import DSTDatasetForDST
 
 class DSTDatasetForDSTForSlot(DSTDatasetForDST):
     def __init__(self, *args, negative_ratio: float = 1.0, **kwargs):
-        super().__init__(*args, **kwargs)
         self.negative_ratio = negative_ratio
+
+        super().__init__(*args, **kwargs)
 
     def __len__(self):
         return super().__len__()
+
+    def check_item(self, index: int):
+        dialogue, turn_idx = super().__getitem__(index)
+        turn = dialogue["turns"][turn_idx]
+
+        assert (
+            len(self.get_positive_service_slot_names(turn)) > 0
+            and len(self.get_negative_slots(dialogue, turn)) > 0
+        )
 
     def __getitem__(self, index: int):
         dialogue, turn_idx = super().__getitem__(index)

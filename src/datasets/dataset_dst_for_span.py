@@ -10,6 +10,19 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
     def __len__(self):
         return super().__len__()
 
+    def check_item(self, index: int):
+        dialogue, turn_idx = super().__getitem__(index)
+        turn = dialogue["turns"][turn_idx]
+
+        candidates = [
+            (service, slot)
+            for service, slot in self.get_positive_service_slot_names(dialogue["turns"][turn_idx])
+            if not self.schema.service_by_name[service].slot_by_name[slot].is_categorical
+        ]
+
+        assert len(candidates) > 0
+
+
     def __getitem__(self, index: int):
         dialogue, turn_idx = super().__getitem__(index)
         turn = dialogue["turns"][turn_idx]
@@ -68,4 +81,3 @@ if __name__ == "__main__":
 
     print(len(dataset))
     print(dataset[0])
-    print(dataset[42])

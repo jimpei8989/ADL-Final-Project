@@ -6,6 +6,7 @@ from typing import List, Optional, Tuple
 from datasets.dataset import DSTDataset
 from datasets.schema import Schema, Slot
 from utils.logger import logger
+from utils.tqdmm import tqdmm
 
 
 class DSTDatasetForDST(DSTDataset):
@@ -43,9 +44,37 @@ class DSTDatasetForDST(DSTDataset):
                 self.dialogue_num_user_turns_ps[-1] + len(user_turns)
             )
 
+        self.valid_indices = None
+        self.sanity_check_on = False
+
         logger.info(
             f"Finished preprocessing dialogues, there're {len(self)} user turns in total..."
         )
+
+        self.valid_indices = self.sanity_check()
+
+        logger.info(
+            f"Finished filtering bad samples, there're {len(self)} user turns left..."
+        )
+
+    def sanity_check(self) -> List[int]:
+        self.sanity_check_on = True
+
+        ret = []
+
+        for i in tqdmm(range(len(self)), desc="Filterring bad data"):
+            try:
+                self.check_item(i)
+            except AssertionError:
+                logger.debug(f"Sample {i} fails on sanity check")
+            else:
+                ret.append(i)
+
+        self.sanity_check_on = False
+        return ret
+
+    def check_item(self, index: int):
+        raise NotImplementedError
 
     def get_utterance_tokens(
         self,
@@ -117,6 +146,8 @@ class DSTDatasetForDST(DSTDataset):
         return [n for n in self.get_all_service_slot_names(dialogue) if n not in positive_names]
 
     def __getitem__(self, index: int):
+        index = self.get_real_index(index)
+
         # find an i s.t. a[i] <= index < a[i + 1]
         i = bisect_right(self.dialogue_num_user_turns_ps, index) - 1
         offset = index - self.dialogue_num_user_turns_ps[i]
@@ -131,7 +162,16 @@ class DSTDatasetForDST(DSTDataset):
         return (dialogue, turn_idx)
 
     def __len__(self):
-        return self.dialogue_num_user_turns_ps[-1]
+        if self.valid_indices is not None:
+            return len(self.valid_indices)
+        else:
+            return self.dialogue_num_user_turns_ps[-1]
+
+    def get_real_index(self, index: int) -> int:
+        if self.valid_indices is not None:
+            return self.valid_indices[index]
+        else:
+            return index
 
 
 if __name__ == "__main__":
