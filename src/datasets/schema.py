@@ -29,6 +29,7 @@ class Service:
 
     def __post_init__(self):
         self.slots = [Slot(**s) for s in self.slots]
+        self.slot_by_name = {s.name: s for s in self.slots}
 
     @property
     def name(self):
