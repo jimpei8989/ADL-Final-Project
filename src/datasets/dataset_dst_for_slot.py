@@ -45,13 +45,13 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
         )
 
         input_ids = self.tokenizer(
-            utterance, slot_tokens, is_split_into_words=True, padding="max_length"
+            utterance, slot_tokens, is_split_into_words=True, padding="max_length", max_length=self.max_seq_length
         ).input_ids
-
+        print(f"type 0: input_ids len = {len(input_ids)}")
         return {
             "type": 0,
             "input_ids": torch.as_tensor(input_ids, dtype=torch.long),
-            "label": positive,
+            "slot_labels": positive,
         }
 
 

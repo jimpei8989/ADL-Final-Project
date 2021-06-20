@@ -9,6 +9,7 @@ class MTDataLoader:
     def __init__(self, *dataloaders):
         self.dataloaders = dataloaders
         self.total_samples = sum(map(lambda a: len(a), self.dataloaders))
+        self.dataset = [None] * sum(len(dataloader.dataset) for dataloader in self.dataloaders)
 
     def __len__(self):
         return self.total_samples
