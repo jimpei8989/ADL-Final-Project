@@ -74,16 +74,17 @@ class DSTTrainer(Trainer):
             for inputs in tqdmm(eval_dataloader):
                 inputs = self._prepare_inputs(inputs)
                 outputs = self.model(**inputs)
-                total_loss += outputs["loss"]
+                total_loss += outputs["loss"].item()
                 for label_type in self.label_names:
                     pred = outputs[f"{label_type.replace('_labels', '')}_logits"]
                     if label_type in inputs:
                         labels = inputs[label_type]
-                        if pred.shape[-1] > 1:
+                        if len(pred.shape) > 1:
                             ret[label_type][0] += (
                                 (torch.argmax(pred, dim=-1) == labels).float().mean().item()
                             )
                         else:
+                            pred = torch.nn.Sigmoid()(pred)
                             ret[label_type][0] += ((pred > 0.5) == labels).float().mean().item()
                         ret[label_type][1] += 1
 
@@ -92,4 +93,5 @@ class DSTTrainer(Trainer):
                 ret["eval_" + key] = ret.pop(key)
             ret.update({"eval_loss": total_loss / len(eval_dataloader)})
 
+        print(ret)
         return ret

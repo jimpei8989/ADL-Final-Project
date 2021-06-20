@@ -47,7 +47,7 @@ def parse_args() -> Namespace:
     parser.add_argument("--weight_decay", type=float, default=1e-6)
 
     # data loader
-    parser.add_argument("--batch_size", type=int, default=4)
+    parser.add_argument("--batch_size", type=int, default=8)
     parser.add_argument("--num_workers", type=int, default=0)
     parser.add_argument("--seed", default=24296674, type=int)
 
