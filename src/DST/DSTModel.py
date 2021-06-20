@@ -37,7 +37,7 @@ class DSTModel(torch.nn.Module):
         value_labels=None,
         begin_labels=None,
         end_labels=None,
-        **kwargs
+        **kwargs,
     ) -> Dict[str, torch.Tensor]:
         last_hidden_states = self.backbone(input_ids)["last_hidden_state"]
 

@@ -70,29 +70,26 @@ class DSTTrainer(Trainer):
         ret = {label_type: [0, 0] for label_type in self.label_names}
         total_loss = 0
 
-        for inputs in tqdmm(eval_dataloader):
-            inputs = self._prepare_inputs(inputs)
-            outputs = self.model(inputs["input_ids"])
-            total_loss += outputs["loss"]
+        with torch.no_grad():
+            for inputs in tqdmm(eval_dataloader):
+                inputs = self._prepare_inputs(inputs)
+                outputs = self.model(**inputs)
+                total_loss += outputs["loss"]
+                for label_type in self.label_names:
+                    pred = outputs[f"{label_type.replace('_labels', '')}_logits"]
+                    if label_type in inputs:
+                        labels = inputs[label_type]
+                        if pred.shape[-1] > 1:
+                            ret[label_type][0] += (
+                                (torch.argmax(pred, dim=-1) == labels).float().mean().item()
+                            )
+                        else:
+                            ret[label_type][0] += ((pred > 0.5) == labels).float().mean().item()
+                        ret[label_type][1] += 1
 
-            for label_type in self.label_names:
-                pred = outputs[f"{label_type.replace('_labels', '')}_logits"]
-                if label_type in inputs:
-                    labels = inputs[label_type]
-                    if pred.shape[-1] > 1:
-                        ret[label_type][0] += (
-                            (torch.argmax(pred, dim=-1) == labels).float().mean().item()
-                        )
-                    else:
-                        ret[label_type][0] += (
-                            ((pred > 0.5) == labels).float().mean().item()
-                        )
-                    ret[label_type][1] += 1
+            for key in list(ret.keys()):
+                ret[key] = ret[key][0] / ret[key][1]
+                ret["eval_" + key] = ret.pop(key)
+            ret.update({"eval_loss": total_loss / len(eval_dataloader)})
 
-        for key in ret:
-            ret[key] = ret[key][0] / ret[key][1]
-            ret["eval_" + key] = ret.pop(key)
-        ret.update({"eval_loss": total_loss / len(eval_dataloader)})
-
-        logger.info(ret)
         return ret
