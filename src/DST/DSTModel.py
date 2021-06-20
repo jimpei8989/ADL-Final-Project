@@ -6,7 +6,7 @@ from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss
 
 from transformers import AutoModel, AutoConfig
 
-from DSTModelOutput import DSTModelOutput
+from DST.DSTModelOutput import DSTModelOutput
 
 
 class DSTModel(torch.nn.Module):
@@ -30,8 +30,10 @@ class DSTModel(torch.nn.Module):
         self.span_criterion = CrossEntropyLoss()
 
     def forward(
-        self, input_ids, slot_labels=None, value_labels=None, span_labels=None, **kwargs
+        self, input_ids, slot_labels=None, value_labels=None, begin_labels=None, end_labels=None, **kwargs
     ) -> Dict[str, torch.Tensor]:
+        print(kwargs)
+        print(input_ids.size())
         last_hidden_states = self.backbone(input_ids)["last_hidden_state"]
 
         cls_logits = self.fc(last_hidden_states[:, 0])
@@ -53,9 +55,9 @@ class DSTModel(torch.nn.Module):
         if value_labels is not None:
             value_loss = self.cls_criterion(value_logits, value_labels)
             total_loss += value_loss
-        if span_labels is not None:
-            start_loss = self.span_criterion(start_logits, span_labels[:, 0])
-            end_loss = self.span_criterion(end_logits, span_labels[:, 1])
+        if begin_labels is not None and end_labels is not None:
+            start_loss = self.span_criterion(start_logits, begin_labels)
+            end_loss = self.span_criterion(end_logits, end_labels)
             span_loss = (start_loss + end_loss) / 2
             total_loss += span_loss
 
