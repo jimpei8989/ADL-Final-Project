@@ -47,7 +47,7 @@ def parse_args() -> Namespace:
     parser.add_argument("--weight_decay", type=float, default=1e-6)
 
     # data loader
-    parser.add_argument("--batch_size", type=int, default=16)
+    parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--num_workers", type=int, default=0)
     parser.add_argument("--seed", default=24296674, type=int)
 
@@ -116,6 +116,7 @@ def main(args):
         label_names=["slot_labels", "value_labels", "begin_labels", "end_labels"],
         load_best_model_at_end=True,
         fp16=args.fp16,
+        max_steps=2 ** 20,
     )
 
     dataloader_cls = DataloaderCLS(tokenizer, args.batch_size, args.num_workers)
@@ -128,6 +129,9 @@ def main(args):
         train_dataloader_cls=dataloader_cls.to_train_dataloader,
         eval_dataloader_cls=dataloader_cls.to_eval_dataloader,
         dataset_kwargs={"system_token": tokenizer.sep_token, "user_token": tokenizer.sep_token},
+        for_slot_kwargs={"max_seq_length": model.max_position_embeddings - 10},
+        for_categorical_kwargs={"max_seq_length": model.max_position_embeddings - 10},
+        for_span_kwargs={"max_seq_length": model.max_position_embeddings - 10},
         model=model,
         args=train_args,
         compute_metrics=compute_metrics,

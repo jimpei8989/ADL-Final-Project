@@ -12,5 +12,5 @@ class DSTModelOutput(ModelOutput):
     span_loss: Optional[torch.FloatTensor] = None
     slot_logits: torch.FloatTensor = None
     value_logits: torch.FloatTensor = None
-    start_logits: torch.FloatTensor = None
+    begin_logits: torch.FloatTensor = None
     end_logits: torch.FloatTensor = None
