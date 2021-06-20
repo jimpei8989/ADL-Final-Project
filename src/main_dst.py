@@ -43,7 +43,6 @@ def parse_args() -> Namespace:
     parser.add_argument("--ckpt_dir", type=Path, default="./ckpt/DST/default/")
 
     # optimizer
-    parser.add_argument("--lr", type=float, default=1e-5)
     parser.add_argument("--weight_decay", type=float, default=1e-6)
 
     # data loader
@@ -101,7 +100,6 @@ def main(args):
 
     train_args = TrainingArguments(
         args.ckpt_dir,
-        learning_rate=args.lr,
         weight_decay=args.weight_decay,
         evaluation_strategy="epoch",
         logging_strategy="epoch",
