@@ -62,19 +62,17 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
             dialogue, turn_idx, max_length=self.max_seq_length - len(slot_tokens) - 3
         )
 
-        input_ids = self.tokenizer.encode_plus(
-            utterance, slot_tokens, is_split_into_words=True, padding="max_length", max_length=self.max_seq_length
+        input_ids = self.tokenizer(
+            self.tokenizer.convert_tokens_to_string(utterance),
+            self.tokenizer.convert_tokens_to_string(slot_tokens),
+            padding="max_length",
+            max_length=self.max_seq_length,
         ).input_ids
-        print(utterance)
-        print(self.tokenizer.convert_tokens_to_string(utterance))
-        print(slot_tokens)
-        # print(input_ids)
-        print(self.tokenizer.convert_ids_to_tokens(input_ids))
-        print(f"type 1: utterece len = {len(utterance)} slot len = {len(slot_tokens)} input_ids len = {len(input_ids)} max len = {self.max_seq_length}")
+
         return {
             "type": 1,
             "input_ids": torch.as_tensor(input_ids, dtype=torch.long),
-            "value_labels": positive,
+            "value_labels": float(positive),
         }
 
 

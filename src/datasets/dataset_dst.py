@@ -85,7 +85,6 @@ class DSTDatasetForDST(DSTDataset):
         tokens = []
         cur_len = 0
         begin_token_idx, end_token_idx = None, None
-        print(f'get utterence with max length {max_length}')
 
         while turn_idx >= 0:
             special_token = self.user_token if turn_idx % 2 else self.system_token

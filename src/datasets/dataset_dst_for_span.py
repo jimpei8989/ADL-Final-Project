@@ -54,9 +54,12 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
         )
 
         input_ids = self.tokenizer(
-            utterance, slot_tokens, is_split_into_words=True, padding="max_length", max_length=self.max_seq_length
+            self.tokenizer.convert_tokens_to_string(utterance),
+            self.tokenizer.convert_tokens_to_string(slot_tokens),
+            padding="max_length",
+            max_length=self.max_seq_length,
         ).input_ids
-        print(f"type 2: input_ids len = {len(input_ids)}")
+
         return {
             "type": 2,
             "input_ids": torch.as_tensor(input_ids, dtype=torch.long),
