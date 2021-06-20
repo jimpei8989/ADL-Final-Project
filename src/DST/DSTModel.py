@@ -36,7 +36,7 @@ class DSTModel(torch.nn.Module):
         print(input_ids.size())
         last_hidden_states = self.backbone(input_ids)["last_hidden_state"]
 
-        cls_logits = self.fc(last_hidden_states[:, 0])
+        cls_logits = self.cls_fc(last_hidden_states[:, 0])
         slot_logits = cls_logits[:, 0]
         value_logits = cls_logits[:, 1]
 
