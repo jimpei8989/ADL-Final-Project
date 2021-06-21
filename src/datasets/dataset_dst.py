@@ -122,10 +122,6 @@ class DSTDatasetForDST(DSTDataset):
 
         utterance_tokens = sum(tokens[::-1], [])
         if begin_token_idx is not None:
-            assert (
-                begin_char.lower() in utterance_tokens[begin_token_idx].lower()
-                and end_char.lower() in utterance_tokens[end_token_idx].lower()
-            )
             return utterance_tokens, begin_token_idx, end_token_idx
         else:
             return utterance_tokens
