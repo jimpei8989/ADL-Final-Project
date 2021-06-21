@@ -60,7 +60,10 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
             max_length=512,
         ).input_ids
         # if (len(input_ids)) > self.max_seq_length:
-        #     print(f"type: {type}")
+        # if end_token_idx + 1 > 511 or begin_token_idx + 1 < 0:
+        #     print(f'begin label: {begin_token_idx + 1}')
+        #     print(f'end label: {end_token_idx + 1}')
+        #     print(f"type: 2")
         #     print(f"utterance: {utterance}")
         #     print(f"utterance len: {len(utterance)}")
         #     print(f"slot: {slot_tokens}")
