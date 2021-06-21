@@ -46,6 +46,8 @@ def parse_args() -> Namespace:
     parser.add_argument("--weight_decay", type=float, default=1e-6)
 
     # data loader
+    parser.add_argument("--no_user_token", action="store_true", default=False)
+    parser.add_argument("--no_system_token", action="store_true", default=False)
     parser.add_argument("--batch_size", type=int, default=8)
     parser.add_argument("--num_workers", type=int, default=0)
     parser.add_argument("--seed", default=24296674, type=int)
@@ -119,6 +121,10 @@ def main(args):
 
     dataloader_cls = DataloaderCLS(tokenizer, args.batch_size, args.num_workers)
 
+    dataset_kwargs = {}
+    dataset_kwargs["user_token"] = None if args.no_user_token else tokenizer.sep_token
+    dataset_kwargs["system_token"] = None if args.no_system_token else tokenizer.sep_token
+
     trainer = DSTTrainer(
         train_data_dir=args.train_data_dir,
         eval_data_dir=args.eval_data_dir,
@@ -126,7 +132,7 @@ def main(args):
         tokenizer=tokenizer,
         train_dataloader_cls=dataloader_cls.to_train_dataloader,
         eval_dataloader_cls=dataloader_cls.to_eval_dataloader,
-        dataset_kwargs={"system_token": tokenizer.sep_token, "user_token": tokenizer.sep_token},
+        dataset_kwargs=dataset_kwargs,
         for_slot_kwargs={"max_seq_length": model.max_position_embeddings - 10},
         for_categorical_kwargs={"max_seq_length": model.max_position_embeddings - 10},
         for_span_kwargs={"max_seq_length": model.max_position_embeddings - 10},
