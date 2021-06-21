@@ -48,8 +48,10 @@ def main(args):
     model = NLGClassifier(model_name=args.backbone)
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
+    backbone = str(args.backbone).split("/")[-1]
+
     train_args = TrainingArguments(
-        str(args.ckpt_dir),
+        str(args.ckpt_dir / backbone),
         evaluation_strategy="epoch",
         logging_strategy="epoch",
         save_strategy="epoch",
@@ -86,9 +88,7 @@ def parse_args() -> Namespace:
     parser = ArgumentParser()
 
     # file PATH
-    parser.add_argument(
-        "--train_data", type=Path, default="./dataset/data-0614/train"
-    )
+    parser.add_argument("--train_data", type=Path, default="./dataset/data-0614/train")
     parser.add_argument("--val_data", type=Path, default="./dataset/data-0614/dev")
     parser.add_argument("--test_data", type=Path, default="./dataset/data/test_seen")
     parser.add_argument(
