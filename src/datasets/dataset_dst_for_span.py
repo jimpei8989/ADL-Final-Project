@@ -54,14 +54,28 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
         )
 
         input_ids = self.tokenizer(
-            utterance, slot_tokens, is_split_into_words=True, padding="max_length"
+            self.tokenizer.convert_tokens_to_string(utterance),
+            self.tokenizer.convert_tokens_to_string(slot_tokens),
+            padding="max_length",
+            max_length=512,
         ).input_ids
-
+        # if (len(input_ids)) > self.max_seq_length:
+        # if end_token_idx + 1 > 511 or begin_token_idx + 1 < 0:
+        #     print(f'begin label: {begin_token_idx + 1}')
+        #     print(f'end label: {end_token_idx + 1}')
+        #     print(f"type: 2")
+        #     print(f"utterance: {utterance}")
+        #     print(f"utterance len: {len(utterance)}")
+        #     print(f"slot: {slot_tokens}")
+        #     print(f"slot len: {len(slot_tokens)}")
+        #     print(f"inputs: {self.tokenizer.convert_ids_to_tokens(input_ids)}")
+        #     print(f"inputs len: {len(input_ids)}")
+        #     print(f"turn: {turn}")
         return {
             "type": 2,
             "input_ids": torch.as_tensor(input_ids, dtype=torch.long),
-            "begin_token_idx": begin_token_idx + 1,
-            "end_token_idx": end_token_idx + 1,
+            "begin_labels": begin_token_idx + 1,
+            "end_labels": end_token_idx + 1,
         }
 
 

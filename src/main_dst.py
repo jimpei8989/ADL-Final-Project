@@ -1,29 +1,156 @@
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
+import torch
+import numpy as np
+import random
+
+from torch.utils.data import DataLoader
+
+from transformers import (
+    PreTrainedTokenizerBase,
+    AutoTokenizer,
+    TrainingArguments,
+    EarlyStoppingCallback,
+)
 
 from datasets.dataset_dst import DSTDatasetForDST
 from datasets.schema import Schema
 from utils.logger import logger
+from datasets.dst_collator import DSTCollator
+from DST.DSTTrainer import DSTTrainer
+from DST.DSTModel import DSTModel
+
+
+def set_seed(seed):
+    torch.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    random.seed(seed)
+    np.random.seed(seed)
+
+
+def compute_metrics(eval_pred):
+    predictions, labels = eval_pred
+    print(f"predictions type = {type(predictions)}, shape = {predictions.shape}")
+    print(f"labels type = {type(labels)}, shape = {labels.shape}")
 
 
 def parse_args() -> Namespace:
     parser = ArgumentParser()
-    parser.add_argument("--train_data", type=Path, default="dataset/data/train/")
+    parser.add_argument("--train_data_dir", type=Path, default="dataset/data-0614/train/")
+    parser.add_argument("--eval_data_dir", type=Path, default="dataset/data-0614/dev/")
     parser.add_argument("--schema_json", type=Path, default="dataset/data/schema.json")
-    return parser.parse_args()
+    parser.add_argument("--ckpt_dir", type=Path, default="./ckpt/DST/default/")
+
+    # optimizer
+    parser.add_argument("--weight_decay", type=float, default=1e-6)
+
+    # data loader
+    parser.add_argument("--no_user_token", action="store_true", default=False)
+    parser.add_argument("--no_system_token", action="store_true", default=False)
+    parser.add_argument("--batch_size", type=int, default=8)
+    parser.add_argument("--num_workers", type=int, default=0)
+    parser.add_argument("--seed", default=24296674, type=int)
+
+    # training
+    parser.add_argument("--model_name_or_path", default="models/convbert-dg")
+    parser.add_argument("--accumulate_steps", type=int, default=16)
+    parser.add_argument("--adafactor", action="store_false", default=True)
+    parser.add_argument("--fp16", action="store_false", default=True)
+    parser.add_argument("--num_epoch", type=int, default=100)
+    parser.add_argument("--early_stopping", type=int, default=5)
+
+    args = parser.parse_args()
+    args.seed %= 2 ** 32
+
+    return args
+
+
+class DataloaderCLS:
+    def __init__(self, tokenizer: PreTrainedTokenizerBase, batch_size: int, num_workers: int):
+        self.tokenizer = tokenizer
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+
+    def to_train_dataloader(self, dataset):
+        return DataLoader(
+            dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=self.num_workers,
+            pin_memory=True,
+            collate_fn=DSTCollator(pad_value=self.tokenizer.pad_token_id),
+        )
+
+    def to_eval_dataloader(self, dataset):
+        return DataLoader(
+            dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            pin_memory=True,
+            collate_fn=DSTCollator(pad_value=self.tokenizer.pad_token_id),
+        )
 
 
 def main(args):
     logger.info(args)
+    set_seed(args.seed)
 
-    schema = Schema.load_json(args.schema_json)
-    logger.info(
-        "Schema successfully loaded.\n"
-        f"Possible services: {[s.name for s in schema]}\n"
-        f"Sample schema: {schema.services[0]}"
+    model = DSTModel(model_name=args.model_name_or_path)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+
+    train_args = TrainingArguments(
+        args.ckpt_dir,
+        weight_decay=args.weight_decay,
+        evaluation_strategy="epoch",
+        logging_strategy="epoch",
+        save_strategy="epoch",
+        per_device_train_batch_size=args.batch_size,
+        per_device_eval_batch_size=args.batch_size,
+        dataloader_num_workers=args.num_workers,
+        seed=args.seed,
+        num_train_epochs=args.num_epoch,
+        gradient_accumulation_steps=args.accumulate_steps,
+        adafactor=args.adafactor,
+        label_names=["slot_labels", "value_labels", "begin_labels", "end_labels"],
+        load_best_model_at_end=True,
+        fp16=args.fp16,
+        max_steps=2 ** 20,
     )
 
-    dataset = DSTDatasetForDST(json_dir=args.train_data, schema=schema)
+    dataloader_cls = DataloaderCLS(tokenizer, args.batch_size, args.num_workers)
+
+    dataset_kwargs = {}
+    dataset_kwargs["user_token"] = None if args.no_user_token else tokenizer.sep_token
+    dataset_kwargs["system_token"] = None if args.no_system_token else tokenizer.sep_token
+
+    trainer = DSTTrainer(
+        train_data_dir=args.train_data_dir,
+        eval_data_dir=args.eval_data_dir,
+        schema_json=args.schema_json,
+        tokenizer=tokenizer,
+        train_dataloader_cls=dataloader_cls.to_train_dataloader,
+        eval_dataloader_cls=dataloader_cls.to_eval_dataloader,
+        dataset_kwargs=dataset_kwargs,
+        for_slot_kwargs={"max_seq_length": model.max_position_embeddings - 10},
+        for_categorical_kwargs={"max_seq_length": model.max_position_embeddings - 10},
+        for_span_kwargs={"max_seq_length": model.max_position_embeddings - 10},
+        model=model,
+        args=train_args,
+        compute_metrics=compute_metrics,
+    )
+    trainer.add_callback(EarlyStoppingCallback(early_stopping_patience=args.early_stopping))
+
+    trainer.train()
+    # schema = Schema.load_json(args.schema_json)
+    # logger.info(
+    #     "Schema successfully loaded.\n"
+    #     f"Possible services: {[s.name for s in schema]}\n"
+    #     f"Sample schema: {schema.services[0]}"
+    # )
+
+    # dataset = DSTDatasetForDST(json_dir=args.train_data, schema=schema)
 
 
 if __name__ == "__main__":

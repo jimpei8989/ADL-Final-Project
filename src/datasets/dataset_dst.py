@@ -88,13 +88,16 @@ class DSTDatasetForDST(DSTDataset):
 
         while turn_idx >= 0:
             special_token = self.user_token if turn_idx % 2 else self.system_token
+            utterance = dialogue["turns"][turn_idx]["utterance"]
 
-            t = self.tokenizer.tokenize(dialogue["turns"][turn_idx]["utterance"])
+            t = self.tokenizer.tokenize(utterance)
 
             if begin_str_idx is not None and begin_token_idx is None:
-                encoding = self.tokenizer(dialogue["turns"][turn_idx]["utterance"])
+                encoding = self.tokenizer(utterance)
 
                 # minus the begining [CLS] first
+                begin_char = utterance[begin_str_idx]
+                end_char = utterance[end_str_idx]
                 begin_token_idx = encoding.char_to_token(begin_str_idx) - 1
                 end_token_idx = encoding.char_to_token(end_str_idx) - 1
             elif begin_str_idx is not None:
@@ -108,16 +111,20 @@ class DSTDatasetForDST(DSTDataset):
                     end_token_idx += 1
 
             if max_length is not None and len(t) + cur_len > max_length:
+                if begin_token_idx is not None:
+                    begin_token_idx -= len(t)
+                    end_token_idx -= len(t)
                 break
 
             tokens.append(t)
             cur_len += len(t)
             turn_idx -= 1
 
+        utterance_tokens = sum(tokens[::-1], [])
         if begin_token_idx is not None:
-            return sum(tokens[::-1], []), begin_token_idx, end_token_idx
+            return utterance_tokens, begin_token_idx, end_token_idx
         else:
-            return sum(tokens[::-1], [])
+            return utterance_tokens
 
     def get_positive_service_slot_names(self, turn, filter_slots=False) -> List[Tuple[str, str]]:
         ret = []
