@@ -133,9 +133,10 @@ def main(args):
     dataset_kwargs = {}
     dataset_kwargs["user_token"] = args.user_token
     dataset_kwargs["system_token"] = args.system_token
-    tokenizer.add_special_tokens(
-        {"additional_special_tokens": [args.user_token, args.system_token]}
-    )
+    if args.user_token is not None:
+        tokenizer.add_special_tokens({"additional_special_tokens": [args.user_token]})
+    if args.system_token is not None:
+        tokenizer.add_special_tokens({"additional_special_tokens": [args.system_token]})
 
     trainer = DSTTrainer(
         train_data_dir=args.train_data_dir,
