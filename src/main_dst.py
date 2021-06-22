@@ -53,8 +53,8 @@ def parse_args() -> Namespace:
     # training
     parser.add_argument("--model_name_or_path", default="models/convbert-dg")
     parser.add_argument("--accumulate_steps", type=int, default=16)
-    parser.add_argument("--adafactor", action="store_false", default=True)
-    parser.add_argument("--fp16", action="store_false", default=True)
+    parser.add_argument("--no_adafactor", action="store_true", default=False)
+    parser.add_argument("--no_fp16", action="store_true", default=False)
     parser.add_argument("--num_epoch", type=int, default=100)
     parser.add_argument("--early_stopping", type=int, default=5)
 
@@ -119,10 +119,10 @@ def main(args):
         seed=args.seed,
         num_train_epochs=args.num_epoch,
         gradient_accumulation_steps=args.accumulate_steps,
-        adafactor=args.adafactor,
+        adafactor=not args.no_adafactor,
         label_names=["slot_labels", "value_labels", "begin_labels", "end_labels"],
         load_best_model_at_end=True,
-        fp16=args.fp16,
+        fp16=not args.no_fp16,
         max_steps=2 ** 20,
     )
 
