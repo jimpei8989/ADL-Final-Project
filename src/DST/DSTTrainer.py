@@ -9,7 +9,6 @@ from transformers import PreTrainedTokenizerBase
 
 from datasets.dst_utils import load_dst_dataloader
 from utils.tqdmm import tqdmm
-from DST.DSTEvaluateOutput import DSTEvaluateOutput
 
 
 class DSTTrainer(Trainer):
@@ -93,15 +92,14 @@ class DSTTrainer(Trainer):
 
             for key in list(ret.keys()):
                 ret[key] = ret[key][0] / ret[key][1]
-                ret["eval_" + key] = ret.pop(key)
-            ret.update({"eval_loss": total_loss / len(eval_dataloader)})
+                ret[f"{metric_key_prefix}_" + key] = ret.pop(key)
+            ret.update({f"{metric_key_prefix}_loss": total_loss / len(eval_dataloader)})
 
-            output = DSTEvaluateOutput(metrics=ret)
             self.control = self.callback_handler.on_evaluate(
                 self.args,
                 self.state,
                 self.control,
-                output.metrics,
+                ret,
             )
 
         print(ret)
