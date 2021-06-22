@@ -13,6 +13,7 @@ __pycache__/
 # Model
 models/
 ckpt/
+runs/
 
 # Output
 nlg_gen
