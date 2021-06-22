@@ -1,7 +1,5 @@
 from pathlib import Path
 from typing import Callable, Dict, Optional, List
-from collections import defaultdict
-from dataclasses import asdict
 
 from torch.utils.data import Dataset, DataLoader
 import torch
@@ -10,8 +8,8 @@ from transformers import Trainer
 from transformers import PreTrainedTokenizerBase
 
 from datasets.dst_utils import load_dst_dataloader
-from utils.logger import logger
 from utils.tqdmm import tqdmm
+from DST.DSTEvaluateOutput import DSTEvaluateOutput
 
 
 class DSTTrainer(Trainer):
@@ -81,17 +79,30 @@ class DSTTrainer(Trainer):
                         labels = inputs[label_type]
                         if len(pred.shape) > 1:
                             ret[label_type][0] += (
-                                (torch.argmax(pred, dim=-1) == labels).float().mean().item()
+                                (torch.argmax(pred, dim=-1) == labels)
+                                .float()
+                                .mean()
+                                .item()
                             )
                         else:
                             pred = torch.nn.Sigmoid()(pred)
-                            ret[label_type][0] += ((pred > 0.5) == labels).float().mean().item()
+                            ret[label_type][0] += (
+                                ((pred > 0.5) == labels).float().mean().item()
+                            )
                         ret[label_type][1] += 1
 
             for key in list(ret.keys()):
                 ret[key] = ret[key][0] / ret[key][1]
                 ret["eval_" + key] = ret.pop(key)
             ret.update({"eval_loss": total_loss / len(eval_dataloader)})
+
+            output = DSTEvaluateOutput(metrics=ret)
+            self.control = self.callback_handler.on_evaluate(
+                self.args,
+                self.state,
+                self.control,
+                output.metrics,
+            )
 
         print(ret)
         return ret
