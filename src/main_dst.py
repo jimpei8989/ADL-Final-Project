@@ -13,8 +13,6 @@ from transformers import (
     EarlyStoppingCallback,
 )
 
-from datasets.dataset_dst import DSTDatasetForDST
-from datasets.schema import Schema
 from utils.logger import logger
 from datasets.dst_collator import DSTCollator
 from DST.DSTTrainer import DSTTrainer
@@ -46,8 +44,8 @@ def parse_args() -> Namespace:
     parser.add_argument("--weight_decay", type=float, default=1e-6)
 
     # data loader
-    parser.add_argument("--no_user_token", action="store_true", default=False)
-    parser.add_argument("--no_system_token", action="store_true", default=False)
+    parser.add_argument("--user_token", help="use this after ensuring token is in vocab.txt")
+    parser.add_argument("--system_token", help="use this after ensuring token is in vocab.txt")
     parser.add_argument("--batch_size", type=int, default=8)
     parser.add_argument("--num_workers", type=int, default=0)
     parser.add_argument("--seed", default=24296674, type=int)
@@ -93,6 +91,15 @@ class DataloaderCLS:
         )
 
 
+def special_token_check(token: str, tokenizer: PreTrainedTokenizerBase):
+    if token is not None:
+        ids = tokenizer.convert_tokens_to_ids([token])
+        if len(ids) == 1 and ids != tokenizer.unk_token_id:
+            return True
+        return False
+    return True
+
+
 def main(args):
     logger.info(args)
     set_seed(args.seed)
@@ -121,9 +128,11 @@ def main(args):
 
     dataloader_cls = DataloaderCLS(tokenizer, args.batch_size, args.num_workers)
 
+    assert special_token_check(args.user_token)
+    assert special_token_check(args.system_token)
     dataset_kwargs = {}
-    dataset_kwargs["user_token"] = None if args.no_user_token else tokenizer.sep_token
-    dataset_kwargs["system_token"] = None if args.no_system_token else tokenizer.sep_token
+    dataset_kwargs["user_token"] = args.user_token
+    dataset_kwargs["system_token"] = args.system_token
 
     trainer = DSTTrainer(
         train_data_dir=args.train_data_dir,
@@ -143,14 +152,6 @@ def main(args):
     trainer.add_callback(EarlyStoppingCallback(early_stopping_patience=args.early_stopping))
 
     trainer.train()
-    # schema = Schema.load_json(args.schema_json)
-    # logger.info(
-    #     "Schema successfully loaded.\n"
-    #     f"Possible services: {[s.name for s in schema]}\n"
-    #     f"Sample schema: {schema.services[0]}"
-    # )
-
-    # dataset = DSTDatasetForDST(json_dir=args.train_data, schema=schema)
 
 
 if __name__ == "__main__":
