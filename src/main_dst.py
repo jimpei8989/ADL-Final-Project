@@ -35,7 +35,9 @@ def compute_metrics(eval_pred):
 
 def parse_args() -> Namespace:
     parser = ArgumentParser()
-    parser.add_argument("--train_data_dir", type=Path, default="dataset/data-0614/train/")
+    parser.add_argument(
+        "--train_data_dir", type=Path, default="dataset/data-0614/train/"
+    )
     parser.add_argument("--eval_data_dir", type=Path, default="dataset/data-0614/dev/")
     parser.add_argument("--schema_json", type=Path, default="dataset/data/schema.json")
     parser.add_argument("--ckpt_dir", type=Path, default="./ckpt/DST/default/")
@@ -44,8 +46,12 @@ def parse_args() -> Namespace:
     parser.add_argument("--weight_decay", type=float, default=1e-6)
 
     # data loader
-    parser.add_argument("--user_token", help="use this after ensuring token is in vocab.txt")
-    parser.add_argument("--system_token", help="use this after ensuring token is in vocab.txt")
+    parser.add_argument(
+        "--user_token", help="use this after ensuring token is in vocab.txt"
+    )
+    parser.add_argument(
+        "--system_token", help="use this after ensuring token is in vocab.txt"
+    )
     parser.add_argument("--batch_size", type=int, default=8)
     parser.add_argument("--num_workers", type=int, default=0)
     parser.add_argument("--seed", default=24296674, type=int)
@@ -65,7 +71,9 @@ def parse_args() -> Namespace:
 
 
 class DataloaderCLS:
-    def __init__(self, tokenizer: PreTrainedTokenizerBase, batch_size: int, num_workers: int):
+    def __init__(
+        self, tokenizer: PreTrainedTokenizerBase, batch_size: int, num_workers: int
+    ):
         self.tokenizer = tokenizer
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -128,8 +136,8 @@ def main(args):
 
     dataloader_cls = DataloaderCLS(tokenizer, args.batch_size, args.num_workers)
 
-    assert special_token_check(args.user_token)
-    assert special_token_check(args.system_token)
+    assert special_token_check(args.user_token, tokenizer)
+    assert special_token_check(args.system_token, tokenizer)
     dataset_kwargs = {}
     dataset_kwargs["user_token"] = args.user_token
     dataset_kwargs["system_token"] = args.system_token
@@ -149,7 +157,9 @@ def main(args):
         args=train_args,
         compute_metrics=compute_metrics,
     )
-    trainer.add_callback(EarlyStoppingCallback(early_stopping_patience=args.early_stopping))
+    trainer.add_callback(
+        EarlyStoppingCallback(early_stopping_patience=args.early_stopping)
+    )
 
     trainer.train()
 
