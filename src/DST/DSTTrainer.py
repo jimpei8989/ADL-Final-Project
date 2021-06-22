@@ -95,12 +95,14 @@ class DSTTrainer(Trainer):
                 ret[f"{metric_key_prefix}_" + key] = ret.pop(key)
             ret.update({f"{metric_key_prefix}_loss": total_loss / len(eval_dataloader)})
 
+            self.log(ret)
             self.control = self.callback_handler.on_evaluate(
                 self.args,
                 self.state,
                 self.control,
                 ret,
             )
+            self._memory_tracker.stop_and_update_metrics(ret)
 
         print(ret)
         return ret
