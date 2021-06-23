@@ -1,4 +1,5 @@
 import pickle
+from pathlib import Path
 from typing import Dict
 
 import torch
@@ -10,6 +11,17 @@ from DST.DSTModelOutput import DSTModelOutput
 
 
 class DSTModel(torch.nn.Module):
+    @classmethod
+    def from_pretrained(
+        cls,
+        pretrained_path: Path,
+        model_name: str = "bert-base-uncased",
+        device=torch.device("cpu"),
+    ):
+        model = cls(model_name=model_name)
+        model.load_state_dict(torch.load(pretrained_path, map_location=device))
+        return model
+
     def __init__(
         self,
         model_name: str = None,
