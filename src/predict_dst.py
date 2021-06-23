@@ -129,8 +129,8 @@ def main(args):
 
     predictions = []
 
-    for sample in tqdm(dataset):
-        prediction = predict_single(sample, max_length=model.max_position_embeddings)
+    for sample in tqdm(dataset, ncols=99, desc="Predicting"):
+        prediction = predict_single(sample, max_length=model.max_position_embeddings - 10)
         predictions.append(prediction)
 
     with open(args.prediction_csv, "w") as f:
