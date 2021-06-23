@@ -12,6 +12,8 @@ from datasets.dataset_dst_for_prediction import DSTDatasetForDSTForPrediction
 from datasets.schema import Schema
 from DST.DSTModel import DSTModel
 
+REMOVE_SUFFIXES = [".", ","]
+
 
 def main(args):
     set_seed(args.seed)
@@ -113,7 +115,8 @@ def main(args):
                     end_index = outputs.end_logits[0].argmax()
 
                     if (
-                        encoded.token_to_sequence(0, begin_index) != 0
+                        begin_index > end_index
+                        or encoded.token_to_sequence(0, begin_index) != 0
                         or encoded.token_to_sequence(0, end_index) != 0
                     ):
                         # if the answer is in the latter part, drop this
@@ -121,7 +124,12 @@ def main(args):
                     else:
                         begin_char_index = encoded.token_to_chars(begin_index).start
                         end_char_index = encoded.token_to_chars(end_index).end
-                        state_value = utterance[begin_char_index : end_char_index + 1]
+                        state_value = utterance[begin_char_index : end_char_index + 1].strip()
+
+                        for suffix in REMOVE_SUFFIXES:
+                            if state_value.ends_with(suffix):
+                                state_value = state_value[: -len(suffix)]
+                                break
 
                 if state_value is not None:
                     states.append((f"{service.name}-{slot.name}", state_value))
@@ -137,13 +145,12 @@ def main(args):
     IDs, states = zip(*sorted(predictions))
     states = list(
         map(
-            lambda state: "None"
-            if len(state) == 0
-            else "|".join(f"{a}={b.strip()}" for a, b in state),
+            lambda state: "None" if len(state) == 0 else "|".join(f"{a}={b}" for a, b in state),
             states,
         )
     )
     pd.DataFrame({"id": IDs, "state": states}).to_csv(args.prediction_csv, index=False)
+
 
 def parse_args():
     parser = ArgumentParser()
