@@ -2,6 +2,7 @@ from argparse import ArgumentParser
 from pathlib import Path
 from typing import List, Tuple, Optional
 
+import pandas as pd
 import torch
 from tqdm import tqdm
 from transformers import AutoTokenizer, BatchEncoding
@@ -19,7 +20,7 @@ def main(args):
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
-    dataset = DSTDatasetForDSTForPrediction(json_dir=args.test_data_dir)
+    dataset = DSTDatasetForDSTForPrediction(json_dir=args.test_data_dir, test_mode=args.test_mode)
 
     model = DSTModel.from_pretrained(
         args.pretrained_path, model_name=args.model_name_or_path, device=args.device
@@ -133,13 +134,16 @@ def main(args):
         prediction = predict_single(sample, max_length=model.max_position_embeddings - 10)
         predictions.append(prediction)
 
-    with open(args.prediction_csv, "w") as f:
-        for ID, state in sorted(predictions):
-            state_str = (
-                "None" if len(state) == 0 else "|".join(f"{a}={b.strip()}" for a, b in state)
-            )
-            print(f"{ID},{state_str}", file=f)
-
+    IDs, states = zip(*sorted(predictions))
+    states = list(
+        map(
+            lambda state: "None"
+            if len(state) == 0
+            else "|".join(f"{a}={b.strip()}" for a, b in state),
+            states,
+        )
+    )
+    pd.DataFrame({"id": IDs, "state": states}).to_csv(args.prediction_csv, index=False)
 
 def parse_args():
     parser = ArgumentParser()
@@ -161,6 +165,7 @@ def parse_args():
     parser.add_argument("--no_gpu", dest="gpu", action="store_false")
     parser.add_argument("--gpu_id", type=int)
     parser.add_argument("--seed", default=24296674, type=int)
+    parser.add_argument("--test_mode", action="store_true")
 
     args = parser.parse_args()
 
