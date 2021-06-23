@@ -43,7 +43,11 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
         begin_str_idx, end_str_idx = the_slot["start"], the_slot["exclusive_end"]
 
         slot = self.schema.service_by_name[service_name].slot_by_name[slot_name]
-        slot_tokens = self.tokenizer.tokenize(slot.description)
+        slot_tokens = (
+            self.tokenizer.tokenize(self.schema.service_by_name[service_name].description)
+            + [self.tokenizer.sep_token]
+            + self.tokenizer.tokenize(slot.description)
+        )
 
         utterance, begin_token_idx, end_token_idx = self.get_utterance_tokens(
             dialogue,

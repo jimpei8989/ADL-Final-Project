@@ -39,7 +39,11 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
         service, slot = candidates[slot_idx]
         slot_desc = self.schema.service_by_name[service].slot_by_name[slot].description
 
-        slot_tokens = self.tokenizer.tokenize(slot_desc)
+        slot_tokens = (
+            self.tokenizer.tokenize(self.schema.service_by_name[service].description)
+            + [self.tokenizer.sep_token]
+            + self.tokenizer.tokenize(slot_desc)
+        )
         utterance = self.get_utterance_tokens(
             dialogue, turn_idx, max_length=self.max_seq_length - len(slot_tokens) - 3
         )

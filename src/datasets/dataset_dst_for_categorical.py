@@ -53,7 +53,9 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
             value = incorrect_answers[int(random.random() * len(incorrect_answers))]
 
         slot_tokens = (
-            self.tokenizer.tokenize(slot.description)
+            self.tokenizer.tokenize(self.schema.service_by_name[service_name].description)
+            + [self.tokenizer.sep_token]
+            + self.tokenizer.tokenize(slot.description)
             + [self.tokenizer.sep_token]
             + self.tokenizer.tokenize(value)
         )
