@@ -5,7 +5,7 @@ from typing import List, Tuple, Optional
 import pandas as pd
 import torch
 from tqdm import tqdm
-from transformers import AutoTokenizer, BatchEncoding
+from transformers import AutoTokenizer, BatchEncoding, PreTrainedTokenizerBase
 from transformers.trainer_utils import set_seed
 
 from datasets.dataset_dst_for_prediction import DSTDatasetForDSTForPrediction
@@ -15,6 +15,15 @@ from DST.DSTModel import DSTModel
 REMOVE_SUFFIXES = [".", ","]
 
 
+def special_token_check(token: str, tokenizer: PreTrainedTokenizerBase):
+    if token is not None:
+        ids = tokenizer.convert_tokens_to_ids([token])
+        if len(ids) == 1 and ids[0] != tokenizer.unk_token_id:
+            return True
+        return False
+    return True
+
+
 def main(args):
     set_seed(args.seed)
 
@@ -22,7 +31,19 @@ def main(args):
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
-    dataset = DSTDatasetForDSTForPrediction(json_dir=args.test_data_dir, test_mode=args.test_mode)
+    assert special_token_check(args.user_token, tokenizer)
+    assert special_token_check(args.system_token, tokenizer)
+    dataset_kwargs = {}
+    dataset_kwargs["user_token"] = args.user_token
+    dataset_kwargs["system_token"] = args.system_token
+    if args.user_token is not None:
+        tokenizer.add_special_tokens({"additional_special_tokens": [args.user_token]})
+    if args.system_token is not None:
+        tokenizer.add_special_tokens({"additional_special_tokens": [args.system_token]})
+
+    dataset = DSTDatasetForDSTForPrediction(
+        json_dir=args.test_data_dir, test_mode=args.test_mode
+    )
 
     model = DSTModel.from_pretrained(
         args.pretrained_path, model_name=args.model_name_or_path, device=args.device
@@ -42,7 +63,9 @@ def main(args):
         while turn_idx >= 0:
             turn = turns[turn_idx]
             special_token = user_token if turn["speaker"] == "USER" else system_token
-            utterance = (f"{special_token} " if special_token else "") + turn["utterance"]
+            utterance = (f"{special_token} " if special_token else "") + turn[
+                "utterance"
+            ]
 
             tokenized = tokenizer.tokenize(utterance)
             if max_length is not None and cur_length + len(tokenized) > max_length:
@@ -76,11 +99,16 @@ def main(args):
             system_token=system_token,
         )
 
-        return (utterance, latter), tokenizer([utterance], [latter], return_tensors="pt")
+        return (utterance, latter), tokenizer(
+            [utterance], [latter], return_tensors="pt"
+        )
 
     # TODO: add max_length and user/system token to argparser and adapt to main
     def predict_single(
-        dialogue, max_length: Optional[int] = None
+        dialogue,
+        max_length: Optional[int] = None,
+        user_token: Optional[str] = None,
+        system_token: Optional[str] = None,
     ) -> Tuple[str, List[Tuple[str, str]]]:
         service_slot_pairs = [
             (schema.service_by_name[service], slot)
@@ -91,11 +119,15 @@ def main(args):
         states = []
         for service, slot in service_slot_pairs:
             (utterance, _), encoded = form_input(
-                dialogue["turns"], slot_description=slot.description, max_length=max_length
+                dialogue["turns"],
+                slot_description=slot.description,
+                max_length=max_length,
+                user_token=user_token,
+                system_token=system_token,
             )
             outputs = model(input_ids=encoded.input_ids.to(args.device))
 
-            if outputs.slot_logits[0] > 0.5:
+            if outputs.slot_logits[0] > 0:
                 state_value = None
                 if slot.is_categorical:
                     scores = {}
@@ -124,10 +156,12 @@ def main(args):
                     else:
                         begin_char_index = encoded.token_to_chars(begin_index).start
                         end_char_index = encoded.token_to_chars(end_index).end
-                        state_value = utterance[begin_char_index : end_char_index + 1].strip()
+                        state_value = utterance[
+                            begin_char_index : end_char_index + 1
+                        ].strip()
 
                         for suffix in REMOVE_SUFFIXES:
-                            if state_value.ends_with(suffix):
+                            if state_value.endswith(suffix):
                                 state_value = state_value[: -len(suffix)]
                                 break
 
@@ -139,13 +173,17 @@ def main(args):
     predictions = []
 
     for sample in tqdm(dataset, ncols=99, desc="Predicting"):
-        prediction = predict_single(sample, max_length=model.max_position_embeddings - 10)
+        prediction = predict_single(
+            sample, max_length=model.max_position_embeddings - 10
+        )
         predictions.append(prediction)
 
     IDs, states = zip(*sorted(predictions))
     states = list(
         map(
-            lambda state: "None" if len(state) == 0 else "|".join(f"{a}={b}" for a, b in state),
+            lambda state: "None"
+            if len(state) == 0
+            else "|".join(f"{a}={b}" for a, b in state),
             states,
         )
     )
@@ -164,6 +202,12 @@ def parse_args():
     parser.add_argument("--schema_json", type=Path, default="dataset/data/schema.json")
     parser.add_argument("--batch_size", type=int, default=8)
     parser.add_argument("--num_workers", type=int, default=0)
+    parser.add_argument(
+        "--user_token", help="use this after ensuring token is in vocab.txt"
+    )
+    parser.add_argument(
+        "--system_token", help="use this after ensuring token is in vocab.txt"
+    )
 
     # Prediction
     parser.add_argument("--prediction_csv", type=Path, default="prediction.csv")
