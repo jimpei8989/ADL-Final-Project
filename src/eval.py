@@ -1,14 +1,15 @@
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 import json
-import numpy as np
+from collections import defaultdict
+import pandas as pd
 
 
 def get_args() -> Namespace:
     parser = ArgumentParser()
 
-    parser.add_argument("--data_dir", type=Path)
-    parser.add_argument("--pred_file", type=Path)
+    parser.add_argument("--data_dir", "-g", type=Path, required=True)
+    parser.add_argument("--pred_file", "-p", type=Path, required=True)
     parser.add_argument("--first_only", action="store_true")
 
     args = parser.parse_args()
@@ -16,37 +17,54 @@ def get_args() -> Namespace:
     return args
 
 
-def analyze(data: np.ndarray, name: str) -> None:
-    print(f"analyze {name} with {len(data)} data")
-    for quantile in [50, 75, 95, 97.5, 99, 99.5]:
-        print(f"{quantile}% quantile of data is {np.percentile(data, quantile)}")
+def check_OR(labels):
+    withOR = set()
+    for ids, states in labels.items():
+        for k, v in states.items():
+            if "|" in v:
+                withOR.add(f"{ids}-{k}")
+
+
+def eval(args):
+    labels = {}
+    for data_path in args.data_dir.iterdir():
+        for dialogue in json.loads(data_path.read_bytes()):
+            state = defaultdict(str)
+            for t in dialogue["turns"]:
+                if t["speaker"] == "SYSTEM":
+                    continue
+                for frame in t["frames"]:
+                    for k, v in frame["state"]["slot_values"].items():
+                        state[f"{frame['service']}-{k}"] = v[0]
+            labels[dialogue["dialogue_id"]] = dict(state)
+    check_OR(labels)
+
+    df = pd.read_csv(args.pred_file)
+    preds = {}
+    for _, row in df.iterrows():
+        if row["state"] != "None":
+            try:
+                preds[row["id"]] = {
+                    kv.split("=")[0]: kv.split("=")[1] for kv in row["state"].split("|")
+                }
+            except:
+                preds[row["id"]] = {"Error": "contain |"}
+                print(row["state"])
+        else:
+            preds[row["id"]] = {}
+
+    assert len(labels) == len(preds)
+    correct = 0
+    for dialogue_id in labels:
+        if (
+            len(labels[dialogue_id]) == len(preds[dialogue_id])
+            and labels[dialogue_id] == preds[dialogue_id]
+        ):
+            correct += 1
+    print(f"Accuracy = {correct/len(labels)} ; {correct} / {len(labels)}")
 
 
 if __name__ == "__main__":
     args = get_args()
 
-    labels = {
-        dialogue["dialogue_id"]: dialogue["turns"][-2]["state"]
-        for data_path in args.data_dir.iterdir()
-        for dialogue in json.loads(data_path.read_bytes())
-    }
-
-    with open(args.pred_file, "r") as f:
-        preds = {line.split(',')[0]: line.split(',')[1] for line in f}
-
-    assert len(labels) == len(preds)
-    for dialogue_id in labels:
-        label = labels[dialogue_id]
-        pred = preds[dialogue_id]
-        pred = {for pair in pred.split('|')}
-
-
-    turn_num = np.array(turn_num)
-    total_utterance_len = np.array(total_utterance_len)
-    for max_length in range(480, 520, 10):
-        print(
-            f"there are {(total_utterance_len > max_length).mean()} of {len(total_utterance_len)} dialogue more than {max_length}"
-        )
-
-    analyze(turn_num, "turn num")
-    analyze(total_utterance_len, "total_utterance_len")
+    eval(args)

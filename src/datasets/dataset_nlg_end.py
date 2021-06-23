@@ -42,11 +42,12 @@ class DSTDatasetForNLGEnd(DSTDatasetForNLG):
 
     def __getitem__(self, index):
         if self.mode == "train":
-            inp = (
-                "user_utterance"
-                if self.which_side == "beginning"
-                else "system_utterance"
-            )
+            inp = "system_utterance"
+            # inp = (
+            #     "user_utterance"
+            #     if self.which_side == "beginning"
+            #     else "system_utterance"
+            # )
             d = self.good_end_nlg[index]
             return {
                 "input_ids": self.tokenizer.encode(d[inp]),
@@ -62,7 +63,8 @@ class DSTDatasetForNLGEnd(DSTDatasetForNLG):
             return len(self.nlg_data)
 
     def collate_fn(self, datas):
-        inp = "user_utterance" if self.which_side == "beginning" else "system_utterance"
+        # inp = "user_utterance" if self.which_side == "beginning" else "system_utterance"
+        inp = "system_utterance"
         return {
             "dialogue_ids": [f"{d['dialogue_id']}_{d['turns_id'][0]}" for d in datas],
             "user": [d["user_utterance"] for d in datas],
