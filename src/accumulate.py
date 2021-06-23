@@ -9,7 +9,6 @@ def get_args() -> Namespace:
 
     parser.add_argument("--input_dir", "-i", type=Path, required=True)
     parser.add_argument("--output_dir", "-o", type=Path, required=True)
-    parser.add_argument("--first_only", action="store_true")
 
     args = parser.parse_args()
 
