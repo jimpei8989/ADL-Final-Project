@@ -4,6 +4,7 @@ from typing import List, Tuple, Optional
 
 import pandas as pd
 import torch
+import torch.nn.functional as nnf
 from tqdm import tqdm
 from transformers import AutoTokenizer, BatchEncoding, PreTrainedTokenizerBase
 from transformers.trainer_utils import set_seed
@@ -141,19 +142,37 @@ def main(args):
 
                         state_value = max(scores.items(), key=lambda p: p[1])[0]
                     else:
-                        begin_index = outputs.begin_logits[0].argmax()
-                        end_index = outputs.end_logits[0].argmax()
+                        begin_scores = nnf.softmax(outputs.begin_logits[0], dim=0)
+                        end_scores = nnf.softmax(outputs.end_logits[0], dim=0)
 
-                        if (
-                            begin_index > end_index
-                            or encoded.token_to_sequence(0, begin_index) != 0
-                            or encoded.token_to_sequence(0, end_index) != 0
-                        ):
-                            # if the answer is in the latter part, drop this
+                        begin_index = begin_scores.argmax()
+                        end_index = end_scores.argmax()
+
+                        # Pair1: begin_index, _end_index
+                        _end_scores = end_scores.clone()
+                        _end_scores[:begin_index] = 0
+                        _end_scores[begin_index + args.max_span_length :] = 0
+                        _end_index = _end_scores.argmax()
+
+                        # Pair2: _begin_index, end_index
+                        _begin_scores = begin_scores.clone()
+                        _begin_scores[end_index + 1 :] = 0
+                        _begin_scores[: max(1, end_index - args.max_span_length + 1)] = 0
+                        _begin_index = _begin_scores.argmax()
+
+                        try:
+                            if (
+                                begin_scores[begin_index] * end_scores[_end_index]
+                                > begin_scores[_begin_index] * end_scores[end_index]
+                            ):
+                                begin_char_index = encoded.token_to_chars(begin_index).start
+                                end_char_index = encoded.token_to_chars(_end_index).start
+                            else:
+                                begin_char_index = encoded.token_to_chars(_begin_index).start
+                                end_char_index = encoded.token_to_chars(end_index).end
+                        except TypeError:
                             state_value = None
                         else:
-                            begin_char_index = encoded.token_to_chars(begin_index).start
-                            end_char_index = encoded.token_to_chars(end_index).end
                             state_value = utterance[begin_char_index : end_char_index + 1].strip(
                                 STRIP_CHARS
                             )
@@ -201,6 +220,7 @@ def parse_args():
 
     # Prediction
     parser.add_argument("--prediction_csv", type=Path, default="prediction.csv")
+    parser.add_argument("--max_span_length", type=int, default=32)
 
     # Misc
     parser.add_argument("--no_gpu", dest="gpu", action="store_false")
