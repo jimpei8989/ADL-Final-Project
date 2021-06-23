@@ -19,7 +19,7 @@ def main(args):
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
-    dataset = DSTDatasetForDSTForPrediction(json_dir=args.test_data_dir, test_mode=True)
+    dataset = DSTDatasetForDSTForPrediction(json_dir=args.test_data_dir)
 
     model = DSTModel.from_pretrained(
         args.pretrained_path, model_name=args.model_name_or_path, device=args.device
