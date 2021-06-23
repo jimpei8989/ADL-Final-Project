@@ -154,28 +154,43 @@ def main(args):
                         _end_scores[begin_index + args.max_span_length :] = 0
                         _end_index = _end_scores.argmax()
 
+                        pair1_score = begin_scores[begin_index] * end_scores[_end_index]
+                        if (
+                            encoded.token_to_sequence(0, begin_index) != 0
+                            or encoded.token_to_sequence(0, _end_index) != 0
+                        ):
+                            pair1_score = 0
+
                         # Pair2: _begin_index, end_index
                         _begin_scores = begin_scores.clone()
                         _begin_scores[end_index + 1 :] = 0
                         _begin_scores[: max(1, end_index - args.max_span_length + 1)] = 0
                         _begin_index = _begin_scores.argmax()
 
+                        pair2_score = begin_scores[_begin_index] * end_scores[end_index]
+                        if (
+                            encoded.token_to_sequence(0, _begin_index) != 0
+                            or encoded.token_to_sequence(0, end_index) != 0
+                        ):
+                            pair2_score = 0
+
                         try:
-                            if (
-                                begin_scores[begin_index] * end_scores[_end_index]
-                                > begin_scores[_begin_index] * end_scores[end_index]
-                            ):
+                            if pair1_score == 0 and pair2_score == 0:
+                                state_value = None
+                            elif pair1_score > pair2_score:
                                 begin_char_index = encoded.token_to_chars(begin_index).start
-                                end_char_index = encoded.token_to_chars(_end_index).start
+                                end_char_index = encoded.token_to_chars(_end_index).end
+                                state_value = utterance[
+                                    begin_char_index : end_char_index + 1
+                                ].strip(STRIP_CHARS)
                             else:
                                 begin_char_index = encoded.token_to_chars(_begin_index).start
                                 end_char_index = encoded.token_to_chars(end_index).end
+                                state_value = utterance[
+                                    begin_char_index : end_char_index + 1
+                                ].strip(STRIP_CHARS)
                         except TypeError:
                             state_value = None
-                        else:
-                            state_value = utterance[begin_char_index : end_char_index + 1].strip(
-                                STRIP_CHARS
-                            )
 
                     if state_value is not None:
                         states[f"{service.name}-{slot.name}"] = state_value
