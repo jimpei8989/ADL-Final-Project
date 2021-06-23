@@ -88,7 +88,7 @@ def main(args):
         states = []
         for service, slot in service_slot_pairs:
             (utterance, _), encoded = form_input(
-                dialogue["turns"], slot_description=slot.description
+                dialogue["turns"], slot_description=slot.description, max_length=max_length
             )
             outputs = model(input_ids=encoded.input_ids.to(args.device))
 
