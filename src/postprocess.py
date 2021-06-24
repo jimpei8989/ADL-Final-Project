@@ -4,7 +4,9 @@ from pathlib import Path
 from nltk import tokenize
 from sentence_transformers import SentenceTransformer
 from tqdm import tqdm
-from collections import defaultdict, Counter
+from collections import defaultdict
+import numpy as np
+from threading import Thread
 
 
 def parse_args():
@@ -60,7 +62,7 @@ def system_similarity(
 
 
 def remove_unrelated(model, turn, threshold=0, versus="system"):
-    target_vec = model.encode(turn[versus]).reshape(768, 1)  # (768, )
+    target_vec = model.encode(turn[versus]).reshape(-1, 1)  # (768, )
     for k in ["beginning", "end"]:
         if turn[k] == []:
             continue
@@ -74,42 +76,82 @@ def remove_unrelated(model, turn, threshold=0, versus="system"):
     return turn
 
 
-def filtering(res, threshold=0.1, versus="user"):
+def filtering(res, threshold=0.1, versus=[]):
     model = SentenceTransformer("LaBSE")
     ret = []
     for r in tqdm(res):
         sep = sep_sentence(r)
         sep = system_similarity(model, sep)
-        sep = remove_unrelated(model, sep, threshold, versus)
+        for v in versus:
+            sep = remove_unrelated(model, sep, threshold, v)
         ret.append(sep)
 
     return ret
 
 
 def del_duplicate(res, domain="end"):
-    past_rec, cur_dialogue_id = set(), "-1"
+    model = SentenceTransformer("LaBSE")
+    past_vec, cur_dialogue_id = np.array([]), "-1"
     ret = []
     for r in res:
         dialogue_id = "_".join(r["dialogue_ids"].split("_")[:-1])
         if dialogue_id != cur_dialogue_id:
-            past_rec = set()
+            past_vec = np.array([])
             cur_dialogue_id = dialogue_id
         for s in r[domain]:
-            if s in past_rec:
-                r[domain].remove(s)
-            past_rec.add(s)
+            s_vec = model.encode(s).reshape(-1, 1)
+            if past_vec.shape[0] != 0:
+                if (s_vec.T @ past_vec).max() > 0.7:
+                    r[domain].remove(s)
+                    # print(s_vec.T @ past_vec, s_vec.T.shape, past_vec.shape, s)
+                else:
+                    past_vec = np.hstack([past_vec, s_vec])
+            else:
+                past_vec = s_vec
 
         ret.append(r)
     return ret
 
 
+def postprocessing_single_side(ori, threshold, versus, domain):
+    res = filtering(ori, threshold=threshold, versus=versus)
+    res = del_duplicate(res, domain=domain)
+    result_global[domain] = res
+
+    return res
+
+
+result_global = {"beginning": {}, "end": {}}
+
 if __name__ == "__main__":
     args = parse_args()
-    res_end = filtering(json.load(open(args.end, "r")), threshold=0.05, versus="system")
-    res_end = del_duplicate(res_end, domain="end")
-    res_begin = filtering(
-        json.load(open(args.begin, "r")), threshold=0.1, versus="user"
+    begin_ori = json.load(open(args.begin, "r"))
+    end_ori = json.load(open(args.end, "r"))
+
+    t_begin = Thread(
+        target=postprocessing_single_side,
+        args=(begin_ori, 0.1, ["user"], "beginning"),
     )
+    t_end = Thread(
+        target=postprocessing_single_side,
+        args=(end_ori, 0.05, ["system"], "end"),
+    )
+
+    t_begin.start()
+    t_end.start()
+    t_begin.join()
+    t_end.join()
+    res_begin, res_end = result_global["beginning"], result_global["end"]
+
+    # res_begin = postprocessing_single_side(
+    #     begin_ori, threshold=0.1, versus=["user"], domain="begin"
+    # )
+    # res_end = postprocessing_single_side(
+    #     end_ori,
+    #     threshold=0.05,
+    #     versus=["system"],
+    #     domain="end",
+    # )
 
     ret = defaultdict(dict)
     for b, e in zip(res_begin, res_end):
