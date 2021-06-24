@@ -13,35 +13,20 @@ def parse_args():
     parser = ArgumentParser()
     parser.add_argument("--begin", "-b", type=Path)
     parser.add_argument("--end", "-e", type=Path)
+    parser.add_argument("--banned", type=Path, default="banned_words.json")
     parser.add_argument("--output_file", "-o", type=Path)
 
     args = parser.parse_args()
     return args
 
 
-def remove_banned(turn):
-    banned_words = [
-        "Yes",
-        "No",
-        "n't",
-        "?",
-        "not sure",
-        "but",
-        "no idea",
-        "Oh no",
-        "sorry",
-    ]
-    for k in ["beginning", "end"]:
-        turn[k] = [s for s in turn[k] if all(w not in s for w in banned_words)]
-
-    return turn
-
-
-def sep_sentence(turn):
+def sep_sentence(turn, banned_words):
     turn["beginning"] = tokenize.sent_tokenize(turn["beginning"])
     turn["end"] = tokenize.sent_tokenize(turn["end"])
 
-    turn = remove_banned(turn)
+    for k in ["beginning", "end"]:
+        turn[k] = [s for s in turn[k] if all(w not in s for w in banned_words)]
+
     return turn
 
 
@@ -76,11 +61,11 @@ def remove_unrelated(model, turn, threshold=0, versus="system"):
     return turn
 
 
-def filtering(res, threshold=0.1, versus=[]):
+def filtering(res, threshold=0.1, versus=[], banned_words=[]):
     model = SentenceTransformer("LaBSE")
     ret = []
     for r in tqdm(res):
-        sep = sep_sentence(r)
+        sep = sep_sentence(r, banned_words=banned_words)
         sep = system_similarity(model, sep)
         for v in versus:
             sep = remove_unrelated(model, sep, threshold, v)
@@ -93,7 +78,7 @@ def del_duplicate(res, domain="end"):
     model = SentenceTransformer("LaBSE")
     past_vec, cur_dialogue_id = np.array([]), "-1"
     ret = []
-    for r in res:
+    for r in tqdm(res):
         dialogue_id = "_".join(r["dialogue_ids"].split("_")[:-1])
         if dialogue_id != cur_dialogue_id:
             past_vec = np.array([])
@@ -113,8 +98,8 @@ def del_duplicate(res, domain="end"):
     return ret
 
 
-def postprocessing_single_side(ori, threshold, versus, domain):
-    res = filtering(ori, threshold=threshold, versus=versus)
+def postprocessing_single_side(ori, threshold, versus, domain, banned_words):
+    res = filtering(ori, threshold=threshold, versus=versus, banned_words=banned_words)
     res = del_duplicate(res, domain=domain)
     result_global[domain] = res
 
@@ -125,16 +110,18 @@ result_global = {"beginning": {}, "end": {}}
 
 if __name__ == "__main__":
     args = parse_args()
-    begin_ori = json.load(open(args.begin, "r"))
-    end_ori = json.load(open(args.end, "r"))
+    banned_words = json.loads(args.banned.read_bytes())
+    print(f"Banned List: {banned_words}")
+    begin_ori = json.loads(args.begin.read_bytes())
+    end_ori = json.loads(args.end.read_bytes())
 
     t_begin = Thread(
         target=postprocessing_single_side,
-        args=(begin_ori, 0.1, ["user"], "beginning"),
+        args=(begin_ori, 0.1, ["user"], "beginning", banned_words),
     )
     t_end = Thread(
         target=postprocessing_single_side,
-        args=(end_ori, 0.05, ["system"], "end"),
+        args=(end_ori, 0.05, ["system"], "end", banned_words),
     )
 
     t_begin.start()
