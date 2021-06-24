@@ -27,13 +27,11 @@ class DSTDataset(Dataset):
         self.max_seq_length = max_seq_length
 
     def __getitem__(self, index: int):
-        raise NotImplementedError
+        return self.data[index]
 
     def __len__(self) -> int:
-        raise NotImplementedError
+        return len(self.data)
 
 
 if __name__ == "__main__":
-    dataset = DSTDataset(
-        Path("dataset/data-0610/new-train"), Path("dataset/data/schema.json")
-    )
+    dataset = DSTDataset(Path("dataset/data-0610/new-train"), Path("dataset/data/schema.json"))
