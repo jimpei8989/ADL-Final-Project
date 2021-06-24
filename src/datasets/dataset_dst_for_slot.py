@@ -39,14 +39,8 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
 
         return ret
 
-    def check_item(self, index: int):
-        dialogue, turn_idx = super().__getitem__(index)
-        turn = dialogue["turns"][turn_idx]
-
-        assert (
-            len(self.get_positive_service_slot_names(turn)) > 0
-            and len(self.get_negative_slots(dialogue, turn)) > 0
-        )
+    def check_data(self, dialogue, other):
+        assert all(len(obj) > 0 for obj in other[1:])
 
     def form_data(self, dialogue, other) -> dict:
         turn_idx, positive_pairs, negative_pairs = other
@@ -57,7 +51,7 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
 
         ret = self._form_data(
             dialogue=dialogue,
-            turns=dialogue["turns"][:turn_idx + 1],
+            turns=dialogue["turns"][: turn_idx + 1],
             latter=self.schema.service_by_name[service].slot_by_name[slot].description,
             max_length=self.max_seq_length,
         )
