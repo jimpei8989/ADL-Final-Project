@@ -48,19 +48,21 @@ class DSTDatasetForDST(DSTDataset):
         self.sanity_check_on = False
 
         logger.info(
-            f"Finished preprocessing dialogues, there're {len(self)} user turns in total..."
+            f"Finished preprocessing dialogues, there're {self.dialogue_num_user_turns_ps[-1]} user turns in total..."
         )
 
         self.valid_indices = self.sanity_check()
 
-        logger.info(f"Finished filtering bad samples, there're {len(self)} user turns left...")
+        logger.info(
+            f"Finished filtering bad samples, there're {self.dialogue_num_user_turns_ps[-1]} user turns left..."
+        )
 
     def sanity_check(self) -> List[int]:
         self.sanity_check_on = True
 
         ret = []
 
-        for i in tqdmm(range(len(self)), desc="Filterring bad data"):
+        for i in tqdmm(range(self.dialogue_num_user_turns_ps[-1]), desc="Filterring bad data"):
             try:
                 self.check_item(i)
             except AssertionError:

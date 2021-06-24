@@ -14,3 +14,12 @@ class DSTModelOutput(ModelOutput):
     value_logits: torch.FloatTensor = None
     begin_logits: torch.FloatTensor = None
     end_logits: torch.FloatTensor = None
+
+    # Useful in prediction
+    def logits_by_index(self, index):
+        return DSTModelOutput(
+            slot_logits=self.slot_logits[index],
+            value_logits=self.value_logits[index],
+            begin_logits=self.begin_logits[index],
+            end_logits=self.end_logits[index],
+        )
