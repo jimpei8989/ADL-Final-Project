@@ -1,8 +1,12 @@
 import random
 
-import torch
+from typing import Any, List
 
 from datasets.dataset_dst import DSTDatasetForDST
+
+
+def draw(a: list):
+    return a[int(random.random() * len(a))]
 
 
 class DSTDatasetForDSTForSlot(DSTDatasetForDST):
@@ -11,8 +15,29 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
 
         super().__init__(*args, **kwargs)
 
-    def __len__(self):
-        return super().__len__()
+    def expand(self, dialogue) -> List[Any]:
+        ret = []
+        for turn_idx in range(0, len(dialogue["turns"]), 2):
+            turn = dialogue["turns"][turn_idx]
+            assert turn["speaker"] == "USER"
+
+            all_pairs = [
+                (service, slot)
+                for service in dialogue["services"]
+                for slot in self.schema.service_by_name[service].slot_by_name
+            ]
+
+            positive_pairs = [
+                (frame["service"], slot)
+                for frame in turn["frames"]
+                for slot in frame["state"]["slot_values"]
+            ]
+
+            negative_pairs = list(set(all_pairs) - set(positive_pairs))
+
+            ret.append((turn_idx, positive_pairs, negative_pairs))
+
+        return ret
 
     def check_item(self, index: int):
         dialogue, turn_idx = super().__getitem__(index)
@@ -23,47 +48,24 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
             and len(self.get_negative_slots(dialogue, turn)) > 0
         )
 
-    def __getitem__(self, index: int):
-        dialogue, turn_idx = super().__getitem__(index)
-        turn = dialogue["turns"][turn_idx]
+    def form_data(self, dialogue, other) -> dict:
+        turn_idx, positive_pairs, negative_pairs = other
 
-        positive = int(random.random() * (1 + self.negative_ratio) < 1.0)
+        positive = float(random.random() * (1 + self.negative_ratio) < 1.0)
 
-        candidates = (
-            self.get_positive_service_slot_names(turn)
-            if positive
-            else self.get_negative_slots(dialogue, turn)
+        service, slot = draw(positive_pairs if positive else negative_pairs)
+
+        ret = self._form_data(
+            dialogue=dialogue,
+            turns=dialogue["turns"][:turn_idx + 1],
+            latter=self.schema.service_by_name[service].slot_by_name[slot].description,
+            max_length=self.max_seq_length,
         )
+        ret.update({"slot_labels": positive})
+        return ret
 
-        slot_idx = int(random.random() * len(candidates))
-        service, slot = candidates[slot_idx]
-        slot_desc = self.schema.service_by_name[service].slot_by_name[slot].description
-
-        slot_tokens = self.tokenizer.tokenize(slot_desc)
-        utterance = self.get_utterance_tokens(
-            dialogue, turn_idx, max_length=self.max_seq_length - len(slot_tokens) - 3
-        )
-
-        input_ids = self.tokenizer(
-            self.tokenizer.convert_tokens_to_string(utterance),
-            self.tokenizer.convert_tokens_to_string(slot_tokens),
-            padding="max_length",
-            max_length=512,
-        ).input_ids
-        # if (len(input_ids)) > self.max_seq_length:
-        #     print(f"type: {type}")
-        #     print(f"utterance: {utterance}")
-        #     print(f"utterance len: {len(utterance)}")
-        #     print(f"slot: {slot_tokens}")
-        #     print(f"slot len: {len(slot_tokens)}")
-        #     print(f"inputs: {self.tokenizer.convert_ids_to_tokens(input_ids)}")
-        #     print(f"inputs len: {len(input_ids)}")
-        #     print(f"turn: {turn}")
-        return {
-            "type": 0,
-            "input_ids": torch.as_tensor(input_ids, dtype=torch.long),
-            "slot_labels": float(positive),
-        }
+    def form_latter(self, slot_description) -> str:
+        return slot_description
 
 
 if __name__ == "__main__":

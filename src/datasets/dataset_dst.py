@@ -1,7 +1,5 @@
 from bisect import bisect_right
-from collections import defaultdict
-from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from datasets.dataset import DSTDataset
 from datasets.schema import Schema, Slot
@@ -16,6 +14,7 @@ class DSTDatasetForDST(DSTDataset):
         schema: Schema = None,
         user_token: Optional[str] = None,
         system_token: Optional[str] = None,
+        test_mode: bool = False,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -25,109 +24,145 @@ class DSTDatasetForDST(DSTDataset):
         self.schema = schema
         self.user_token = user_token
         self.system_token = system_token
+        self.test_mode = test_mode
 
         logger.info(f"Successfully loaded {len(self.data)} dialogues...")
         self.data = sorted(self.data, key=lambda d: d["dialogue_id"])
         self.dialogue_by_id = {d["dialogue_id"]: d for d in self.data}
 
-        self.dialogue_user_turns = defaultdict(list)
-        self.dialogue_ids = []
-        self.dialogue_num_user_turns_ps = [0]
+        self.expanded = {}  # dialogue_id -> Any
+        self.prefix_sum = [0]
 
-        for d in self.data:
-            d_id = d["dialogue_id"]
-            user_turns = [i for i, t in enumerate(d["turns"]) if t["speaker"] == "USER"]
+        self.before_expand()
 
-            self.dialogue_user_turns[d_id] = user_turns
-            self.dialogue_ids.append(d_id)
-            self.dialogue_num_user_turns_ps.append(
-                self.dialogue_num_user_turns_ps[-1] + len(user_turns)
-            )
-
-        self.valid_indices = None
-        self.sanity_check_on = False
+        for dialogue in self.data:
+            did = dialogue["dialogue_id"]
+            self.expanded[did] = self.expand(dialogue)
+            self.prefix_sum.append(self.prefix_sum[-1] + len(self.expanded[did]))
 
         logger.info(
-            f"Finished preprocessing dialogues, there're {self.dialogue_num_user_turns_ps[-1]} user turns in total..."
+            f"Finished preprocessing dialogues, there're {self.prefix_sum[-1]} samples in total..."
         )
 
-        self.valid_indices = self.sanity_check()
+        self.valid_indices = self.filter_bad_data()
 
         logger.info(
-            f"Finished filtering bad samples, there're {self.dialogue_num_user_turns_ps[-1]} user turns left..."
+            f"Finished filtering bad samples, there're {len(self.valid_indices)} samples left..."
         )
 
-    def sanity_check(self) -> List[int]:
-        self.sanity_check_on = True
+    # child classes should NOT override len and getitem if possible
+    def __getitem__(self, index: int):
+        index = self.valid_indices[index]
+        return self.form_data(*self.get_dialogue_and_other(index))
 
+    def __len__(self):
+        return len(self.valid_indices) if not self.test_mode else 10
+
+    # About the expanding
+    def before_expand(self) -> None:
+        pass
+
+    def expand(self, dialogue) -> List[Any]:
+        return [None]
+
+    def get_dialogue_and_other(self, index):
+        # find an i s.t. a[i] <= index < a[i + 1]
+        i = bisect_right(self.prefix_sum, index) - 1
+        offset = index - self.prefix_sum[i]
+
+        dialogue = self.data[i]
+        other = self.expanded[dialogue["dialogue_id"]][offset]
+
+        return (dialogue, other)
+
+    # Filter bad data away
+    def filter_bad_data(self) -> List[int]:
         ret = []
-
-        for i in tqdmm(range(self.dialogue_num_user_turns_ps[-1]), desc="Filterring bad data"):
+        for i in tqdmm(range(self.prefix_sum[-1]), desc="Filter bad data"):
             try:
-                self.check_item(i)
+                self.check_data(*self.get_dialogue_and_other(i))
             except AssertionError:
                 logger.debug(f"Sample {i} fails on sanity check")
             else:
                 ret.append(i)
 
-        self.sanity_check_on = False
         return ret
 
-    def check_item(self, index: int):
-        raise NotImplementedError
+    def check_data(self, dialogue, other):
+        return True
 
-    def get_utterance_tokens(
+    # what getitem will return
+    def form_data(self, dialogue, other) -> dict:
+        return self._form_data(
+            dialogue,
+            dialogue["turns"][:-1],  # The last one is the system's one
+            "",
+            max_length=self.max_seq_length,
+        )
+
+    # Form sample
+    def _form_data(
         self,
         dialogue,
-        turn_idx: int,
+        turns: list,
+        latter: str,
         max_length: Optional[int] = None,
         begin_str_idx: Optional[int] = None,
         end_str_idx: Optional[int] = None,
-    ):
-        tokens = []
-        cur_len = 0
-        begin_token_idx, end_token_idx = None, None
+    ) -> dict:
+        # [CLS] utterance [SEP] latter [SEP]
+        latter_token_len = len(self.tokenizer.tokenize(latter))
 
-        while turn_idx >= 0:
-            special_token = self.user_token if turn_idx % 2 else self.system_token
-            utterance = dialogue["turns"][turn_idx]["utterance"]
+        utterances = self.form_utterances(turns, max_length=max_length - latter_token_len - 3)
 
-            t = self.tokenizer.tokenize(utterance)
+        if begin_str_idx is not None and end_str_idx is not None:
+            offset = sum(len(u) for u in utterances[::-1])
+            begin_str_idx += offset
+            end_str_idx += offset
 
-            if begin_str_idx is not None and begin_token_idx is None:
-                encoding = self.tokenizer(utterance)
+        utterance = " ".join(utterances)
+        encoded = self.tokenizer([utterance], [latter], padding="max_length", return_tensors="pt")
 
-                # minus the begining [CLS] first
-                begin_char = utterance[begin_str_idx]
-                end_char = utterance[end_str_idx]
-                begin_token_idx = encoding.char_to_token(begin_str_idx) - 1
-                end_token_idx = encoding.char_to_token(end_str_idx) - 1
-            elif begin_str_idx is not None:
-                begin_token_idx += len(t)
-                end_token_idx += len(t)
+        ret = {
+            "utterance": utterance,
+            "input_ids": encoded.input_ids.squeeze(0),
+        }
 
+        if begin_str_idx is not None and end_str_idx is not None:
+            ret.update(
+                {
+                    "begin_labels": encoded.char_to_token(0, begin_str_idx),
+                    "end_labels": encoded.char_to_token(0, end_str_idx),
+                }
+            )
+
+        return ret
+
+    def form_utterances(
+        self,
+        turns: List,
+        max_length: Optional[int] = None,
+    ) -> List[str]:
+        cur_len, utterances = 0, []
+
+        for turn in turns[::-1]:
+            utterance = turn["utterance"]
+
+            special_token = self.user_token if turn["speaker"] == "USER" else self.system_token
             if special_token is not None:
-                t = [special_token] + t
-                if begin_token_idx is not None:
-                    begin_token_idx += 1
-                    end_token_idx += 1
+                utterance = special_token + " " + utterance
 
-            if max_length is not None and len(t) + cur_len > max_length:
-                if begin_token_idx is not None:
-                    begin_token_idx -= len(t)
-                    end_token_idx -= len(t)
+            utterance_tokens = self.tokenizer.tokenize(utterance)
+
+            if cur_len + len(utterance_tokens) > max_length:
                 break
+            else:
+                utterances.append(utterance)
+                cur_len += len(utterance_tokens)
 
-            tokens.append(t)
-            cur_len += len(t)
-            turn_idx -= 1
+        return utterances[::-1]
 
-        utterance_tokens = sum(tokens[::-1], [])
-        if begin_token_idx is not None:
-            return utterance_tokens, begin_token_idx, end_token_idx
-        else:
-            return utterance_tokens
-
+    # Too lazy to refactor them QAQ, should I
     def get_positive_service_slot_names(self, turn, filter_slots=False) -> List[Tuple[str, str]]:
         ret = []
 
@@ -158,36 +193,21 @@ class DSTDatasetForDST(DSTDataset):
         positive_names = set(self.get_positive_service_slot_names(turn))
         return [n for n in self.get_all_service_slot_names(dialogue) if n not in positive_names]
 
-    def __getitem__(self, index: int):
-        index = self.get_real_index(index)
-
-        # find an i s.t. a[i] <= index < a[i + 1]
-        i = bisect_right(self.dialogue_num_user_turns_ps, index) - 1
-        offset = index - self.dialogue_num_user_turns_ps[i]
-
-        dialogue_id = self.dialogue_ids[i]
-        dialogue = self.dialogue_by_id[dialogue_id]
-
-        assert 0 <= offset < len(self.dialogue_user_turns[dialogue_id])
-
-        turn_idx = self.dialogue_user_turns[dialogue_id][offset]
-
-        return (dialogue, turn_idx)
-
-    def __len__(self):
-        if self.valid_indices is not None:
-            return len(self.valid_indices)
-        else:
-            return self.dialogue_num_user_turns_ps[-1]
-
-    def get_real_index(self, index: int) -> int:
-        if self.valid_indices is not None:
-            return self.valid_indices[index]
-        else:
-            return index
-
 
 if __name__ == "__main__":
+    from pathlib import Path
+
+    from transformers import AutoTokenizer
+
+    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
+
+    schema = Path("../dataset/data/schema.json")
+
     dataset = DSTDatasetForDST(
-        Path("../dataset/data-0610/new-train"), Path("../dataset/data/schema.json")
+        Path("../dataset/data-0610/new-train"),
+        schema=schema,
+        tokenizer=tokenizer,
     )
+
+    print(len(dataset))
+    print(dataset[0])
