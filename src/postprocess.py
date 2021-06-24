@@ -1,5 +1,6 @@
 import json
 from argparse import ArgumentParser
+from os import pardir
 from pathlib import Path
 from nltk import tokenize
 from sentence_transformers import SentenceTransformer
@@ -7,6 +8,9 @@ from tqdm import tqdm
 from collections import defaultdict
 import numpy as np
 from threading import Thread
+from count import count
+from joblib import Parallel, delayed
+from pattern.en import lemma
 
 
 def parse_args():
@@ -107,8 +111,33 @@ def postprocessing_single_side(ori, threshold, versus, domain, banned_words):
     return res
 
 
-def remove_single_appear():
-    pass
+def remove_single_appear(data):
+    import os
+
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+    count_dictionary = count(
+        data,
+        ["user", "mod", "start", "end"],
+    )
+
+    for ids, dialogue in data.items():
+        for turn_ids, turn in dialogue.items():
+            for k in ["start", "end"]:
+                sentences = tokenize.sent_tokenize(turn[k])
+                for sentence in sentences:
+                    if any(
+                        (
+                            (lemma(w) in count_dictionary)
+                            for w in tokenize.word_tokenize(
+                                sentence.replace(". ", ".").replace(".", ". ")
+                            )
+                        )
+                    ):
+                        data[ids][turn_ids][k] = (
+                            data[ids][turn_ids][k].replace(sentence, "").strip()
+                        )
+
+    return data
 
 
 result_global = {"beginning": {}, "end": {}}
@@ -150,5 +179,6 @@ if __name__ == "__main__":
             int(b["dialogue_ids"].split("_")[-1]) + 1,
         )
         ret[dialogue_id][idx] = tmp
+    ret = remove_single_appear(ret)
 
     json.dump(ret, open(args.output_file, "w"), indent=2)
