@@ -1,82 +1,61 @@
-import random
+from typing import Any, List
 
-import torch
 
 from datasets.dataset_dst import DSTDatasetForDST
+from datasets.utils import draw_from_list
 
 
 class DSTDatasetForDSTForSpan(DSTDatasetForDST):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def __len__(self):
-        return super().__len__()
+    def expand(self, dialogue) -> List[Any]:
+        ret = []
+        for turn_idx in range(0, len(dialogue["turns"]), 2):
+            turn = dialogue["turns"][turn_idx]
 
-    def check_item(self, index: int):
-        dialogue, turn_idx = super().__getitem__(index)
-        turn = dialogue["turns"][turn_idx]
+            assert turn["speaker"] == "USER"
 
-        candidates = [
-            (service, slot)
-            for service, slot in self.get_positive_service_slot_names(turn, True)
-            if not self.schema.service_by_name[service].slot_by_name[slot].is_categorical
-        ]
+            span_pairs = []
 
-        assert len(candidates) > 0
+            for frame in turn["frames"]:
+                service = frame["service"]
 
-    def __getitem__(self, index: int):
-        dialogue, turn_idx = super().__getitem__(index)
-        turn = dialogue["turns"][turn_idx]
+                # Currently, only new spans added in this turn will be added...
+                slot_start_ends = {
+                    s["slot"]: (s["start"], s["exclusive_end"] - 1)
+                    for s in frame["slots"]
+                    if "start" in s and "exclusive_end" in s
+                }
 
-        candidates = [
-            (service, slot)
-            for service, slot in self.get_positive_service_slot_names(turn, True)
-            if not self.schema.service_by_name[service].slot_by_name[slot].is_categorical
-        ]
+                span_pairs.extend(
+                    (service, k, *v)
+                    for k, v in slot_start_ends.items()
+                    if k in frame["state"]["slot_values"]
+                )
 
-        chosen_idx = int(random.random() * len(candidates))
-        service_name, slot_name = candidates[chosen_idx]
+            ret.append((turn_idx, span_pairs))
+        return ret
 
-        the_frame = next(filter(lambda f: f["service"] == service_name, turn["frames"]))
-        the_slot = next(filter(lambda s: s["slot"] == slot_name, the_frame["slots"]))
+    def check_data(self, dialogue, other):
+        assert len(other[1]) > 0
 
-        begin_str_idx, end_str_idx = the_slot["start"], the_slot["exclusive_end"]
+    def form_data(self, dialogue, other) -> dict:
+        turn_idx, span_pairs = other
 
-        slot = self.schema.service_by_name[service_name].slot_by_name[slot_name]
-        slot_tokens = self.tokenizer.tokenize(slot.description)
+        service, slot_name, start, end = draw_from_list(span_pairs)
 
-        utterance, begin_token_idx, end_token_idx = self.get_utterance_tokens(
-            dialogue,
-            turn_idx,
-            max_length=self.max_seq_length - len(slot_tokens) - 3,
-            begin_str_idx=begin_str_idx,
-            end_str_idx=end_str_idx - 1,
+        slot = self.schema.service_by_name[service].slot_by_name[slot_name]
+
+        ret = self._form_data(
+            dialogue=dialogue,
+            turns=dialogue["turns"][: turn_idx + 1],
+            latter=slot.description,
+            max_length=self.max_seq_length,
+            begin_str_idx=start,
+            end_str_idx=end,
         )
-
-        input_ids = self.tokenizer(
-            self.tokenizer.convert_tokens_to_string(utterance),
-            self.tokenizer.convert_tokens_to_string(slot_tokens),
-            padding="max_length",
-            max_length=512,
-        ).input_ids
-        # if (len(input_ids)) > self.max_seq_length:
-        # if end_token_idx + 1 > 511 or begin_token_idx + 1 < 0:
-        #     print(f'begin label: {begin_token_idx + 1}')
-        #     print(f'end label: {end_token_idx + 1}')
-        #     print(f"type: 2")
-        #     print(f"utterance: {utterance}")
-        #     print(f"utterance len: {len(utterance)}")
-        #     print(f"slot: {slot_tokens}")
-        #     print(f"slot len: {len(slot_tokens)}")
-        #     print(f"inputs: {self.tokenizer.convert_ids_to_tokens(input_ids)}")
-        #     print(f"inputs len: {len(input_ids)}")
-        #     print(f"turn: {turn}")
-        return {
-            "type": 2,
-            "input_ids": torch.as_tensor(input_ids, dtype=torch.long),
-            "begin_labels": begin_token_idx + 1,
-            "end_labels": end_token_idx + 1,
-        }
+        return ret
 
 
 if __name__ == "__main__":

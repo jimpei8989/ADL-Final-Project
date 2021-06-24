@@ -115,8 +115,12 @@ class DSTDatasetForDST(DSTDataset):
 
         utterances = self.form_utterances(turns, max_length=max_length - latter_token_len - 3)
 
+        if self.user_token:
+            begin_str_idx += len(self.user_token) + 1
+            end_str_idx += len(self.user_token) + 1
+
         if begin_str_idx is not None and end_str_idx is not None:
-            offset = sum(len(u) for u in utterances[::-1])
+            offset = sum(len(u) for u in utterances[:-1])
             begin_str_idx += offset
             end_str_idx += offset
 
@@ -132,8 +136,8 @@ class DSTDatasetForDST(DSTDataset):
         if begin_str_idx is not None and end_str_idx is not None:
             ret.update(
                 {
-                    "begin_labels": encoded.char_to_token(0, begin_str_idx),
-                    "end_labels": encoded.char_to_token(0, end_str_idx),
+                    "begin_labels": encoded.char_to_token(begin_str_idx),
+                    "end_labels": encoded.char_to_token(end_str_idx - 1),
                 }
             )
 
@@ -174,7 +178,7 @@ if __name__ == "__main__":
     schema = Path("../dataset/data/schema.json")
 
     dataset = DSTDatasetForDST(
-        Path("../dataset/data-0610/new-train"),
+        Path("../dataset/data-0614/train"),
         schema=schema,
         tokenizer=tokenizer,
     )
