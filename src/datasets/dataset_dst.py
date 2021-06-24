@@ -1,8 +1,8 @@
 from bisect import bisect_right
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional
 
 from datasets.dataset import DSTDataset
-from datasets.schema import Schema, Slot
+from datasets.schema import Schema
 from utils.logger import logger
 from utils.tqdmm import tqdmm
 
@@ -125,6 +125,7 @@ class DSTDatasetForDST(DSTDataset):
 
         ret = {
             "utterance": utterance,
+            "latter": latter,
             "input_ids": encoded.input_ids.squeeze(0),
         }
 
@@ -161,37 +162,6 @@ class DSTDatasetForDST(DSTDataset):
                 cur_len += len(utterance_tokens)
 
         return utterances[::-1]
-
-    # Too lazy to refactor them QAQ, should I
-    def get_positive_service_slot_names(self, turn, filter_slots=False) -> List[Tuple[str, str]]:
-        ret = []
-
-        for frame in turn["frames"]:
-            # NOTE: some slots has no "start" and "exclusive_end", possibly due to its value
-            # was referenced from other slots
-            in_slots = {s["slot"] for s in frame["slots"] if "start" in s and "exclusive_end" in s}
-            for slot in frame["state"]["slot_values"]:
-                if not filter_slots or slot in in_slots:
-                    ret.append((frame["service"], slot))
-
-        return ret
-
-    def get_all_service_slot_names(self, dialogue) -> List[Tuple[str, str]]:
-        return [
-            (service, slot)
-            for service in dialogue["services"]
-            for slot in self.schema.service_by_name[service].slot_by_name
-        ]
-
-    def get_positive_slots(self, turn) -> List[Slot]:
-        return [
-            self.schema.service_by_name[frame_name].slot_by_name[slot_name]
-            for frame_name, slot_name in self.get_positive_service_slot_names(turn)
-        ]
-
-    def get_negative_slots(self, dialogue, turn):
-        positive_names = set(self.get_positive_service_slot_names(turn))
-        return [n for n in self.get_all_service_slot_names(dialogue) if n not in positive_names]
 
 
 if __name__ == "__main__":
