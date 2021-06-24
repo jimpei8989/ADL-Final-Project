@@ -1,8 +1,9 @@
 from pathlib import Path
 from typing import Callable, Dict, Optional
 
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, get_worker_info
 from transformers import PreTrainedTokenizerBase, AutoTokenizer
+from transformers.trainer_utils import set_seed
 
 from datasets.schema import Schema
 from datasets.dataset_dst_for_slot import DSTDatasetForDSTForSlot
@@ -11,6 +12,14 @@ from datasets.dataset_dst_for_span import DSTDatasetForDSTForSpan
 from datasets.mt_dataloader import MTDataLoader
 
 from utils.logger import logger
+
+
+def set_seed_worker_fn():
+    info = get_worker_info()
+
+    # info is None when the process is the main process
+    if info is not None:
+        set_seed(info.worker_id ^ info.seed)
 
 
 def load_dst_dataloader(
