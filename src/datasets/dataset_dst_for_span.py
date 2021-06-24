@@ -47,13 +47,16 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
 
         slot = self.schema.service_by_name[service].slot_by_name[slot_name]
 
-        ret = self._form_data(
-            dialogue=dialogue,
-            turns=dialogue["turns"][: turn_idx + 1],
-            latter=slot.description,
-            max_length=self.max_seq_length,
-            begin_str_idx=start,
-            end_str_idx=end,
+        ret = {"type": 2}
+        ret.update(
+            self._form_data(
+                dialogue=dialogue,
+                turns=dialogue["turns"][: turn_idx + 1],
+                latter=slot.description,
+                max_length=self.max_seq_length,
+                begin_str_idx=start,
+                end_str_idx=end,
+            )
         )
         return ret
 

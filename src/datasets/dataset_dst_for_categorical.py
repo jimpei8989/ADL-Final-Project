@@ -50,11 +50,14 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
         else:
             value = draw_from_list([ans for ans in slot.possible_values if ans != correct])
 
-        ret = self._form_data(
-            dialogue=dialogue,
-            turns=dialogue["turns"][: turn_idx + 1],
-            latter=f" {self.tokenizer.sep_token} ".join([slot.description, value]),
-            max_length=self.max_seq_length,
+        ret = {"type": 1}
+        ret.update(
+            self._form_data(
+                dialogue=dialogue,
+                turns=dialogue["turns"][: turn_idx + 1],
+                latter=f" {self.tokenizer.sep_token} ".join([slot.description, value]),
+                max_length=self.max_seq_length,
+            )
         )
         ret.update({"value_labels": positive})
         return ret

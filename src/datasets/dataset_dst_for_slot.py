@@ -45,11 +45,14 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
         positive = float(random.random() * (1 + self.negative_ratio) < 1.0)
         service, slot = draw_from_list(positive_pairs if positive else negative_pairs)
 
-        ret = self._form_data(
-            dialogue=dialogue,
-            turns=dialogue["turns"][: turn_idx + 1],
-            latter=self.schema.service_by_name[service].slot_by_name[slot].description,
-            max_length=self.max_seq_length,
+        ret = {"type": 0}
+        ret.update(
+            self._form_data(
+                dialogue=dialogue,
+                turns=dialogue["turns"][: turn_idx + 1],
+                latter=self.schema.service_by_name[service].slot_by_name[slot].description,
+                max_length=self.max_seq_length,
+            )
         )
         ret.update({"slot_labels": positive})
         return ret

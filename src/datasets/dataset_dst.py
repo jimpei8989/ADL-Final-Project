@@ -113,19 +113,25 @@ class DSTDatasetForDST(DSTDataset):
         # [CLS] utterance [SEP] latter [SEP]
         latter_token_len = len(self.tokenizer.tokenize(latter))
 
-        utterances = self.form_utterances(turns, max_length=max_length - latter_token_len - 3)
-
-        if self.user_token:
-            begin_str_idx += len(self.user_token) + 1
-            end_str_idx += len(self.user_token) + 1
+        # The extra -10 are for buffer
+        utterances = self.form_utterances(turns, max_length=max_length - latter_token_len - 3 - 10)
 
         if begin_str_idx is not None and end_str_idx is not None:
-            offset = sum(len(u) for u in utterances[:-1])
+            offset = sum(len(u) for u in utterances[:-1]) + len(utterances) - 1
+            if self.user_token:
+                offset += len(self.user_token) + 1
+
             begin_str_idx += offset
             end_str_idx += offset
 
         utterance = " ".join(utterances)
-        encoded = self.tokenizer([utterance], [latter], padding="max_length", return_tensors="pt")
+        encoded = self.tokenizer(
+            [utterance],
+            [latter],
+            padding="max_length",
+            return_tensors="pt",
+            max_length=self.max_seq_length,
+        )
 
         ret = {
             "utterance": utterance,
@@ -136,6 +142,8 @@ class DSTDatasetForDST(DSTDataset):
         if begin_str_idx is not None and end_str_idx is not None:
             ret.update(
                 {
+                    "begin_str_idx": begin_str_idx,
+                    "end_str_idx": end_str_idx,
                     "begin_labels": encoded.char_to_token(begin_str_idx),
                     "end_labels": encoded.char_to_token(end_str_idx - 1),
                 }
