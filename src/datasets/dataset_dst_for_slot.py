@@ -3,10 +3,7 @@ import random
 from typing import Any, List
 
 from datasets.dataset_dst import DSTDatasetForDST
-
-
-def draw(a: list):
-    return a[int(random.random() * len(a))]
+from datasets.utils import draw_from_list
 
 
 class DSTDatasetForDSTForSlot(DSTDatasetForDST):
@@ -46,8 +43,7 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
         turn_idx, positive_pairs, negative_pairs = other
 
         positive = float(random.random() * (1 + self.negative_ratio) < 1.0)
-
-        service, slot = draw(positive_pairs if positive else negative_pairs)
+        service, slot = draw_from_list(positive_pairs if positive else negative_pairs)
 
         ret = self._form_data(
             dialogue=dialogue,
