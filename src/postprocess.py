@@ -15,6 +15,7 @@ def parse_args():
     parser.add_argument("--end", "-e", type=Path)
     parser.add_argument("--banned", type=Path, default="banned_words.json")
     parser.add_argument("--output_file", "-o", type=Path)
+    parser.add_argument("--clean", action="store_true")
 
     args = parser.parse_args()
     return args
@@ -106,6 +107,10 @@ def postprocessing_single_side(ori, threshold, versus, domain, banned_words):
     return res
 
 
+def remove_single_appear():
+    pass
+
+
 result_global = {"beginning": {}, "end": {}}
 
 if __name__ == "__main__":
@@ -130,16 +135,6 @@ if __name__ == "__main__":
     t_end.join()
     res_begin, res_end = result_global["beginning"], result_global["end"]
 
-    # res_begin = postprocessing_single_side(
-    #     begin_ori, threshold=0.1, versus=["user"], domain="begin"
-    # )
-    # res_end = postprocessing_single_side(
-    #     end_ori,
-    #     threshold=0.05,
-    #     versus=["system"],
-    #     domain="end",
-    # )
-
     ret = defaultdict(dict)
     for b, e in zip(res_begin, res_end):
         for key in ["dialogue_ids", "user", "system"]:
@@ -155,4 +150,5 @@ if __name__ == "__main__":
             int(b["dialogue_ids"].split("_")[-1]) + 1,
         )
         ret[dialogue_id][idx] = tmp
+
     json.dump(ret, open(args.output_file, "w"), indent=2)
