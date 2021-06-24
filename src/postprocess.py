@@ -168,12 +168,20 @@ if __name__ == "__main__":
     for b, e in zip(res_begin, res_end):
         for key in ["dialogue_ids", "user", "system"]:
             assert b[key] == e[key]
-        tmp = {
-            "user": b["user"],  # need to be removed
-            "start": " ".join(b["beginning"]),
-            "mod": b["system"],  # need to be empty
-            "end": " ".join(e["end"]),
-        }
+        if args.clean:
+            tmp = {
+                "start": " ".join(b["beginning"]),
+                "mod": ""
+                "end": " ".join(e["end"]),
+            }
+        else:
+            tmp = {
+                "user": b["user"],  # need to be removed
+                "start": " ".join(b["beginning"]),
+                "mod": b["system"],  # need to be empty
+                "end": " ".join(e["end"]),
+            }
+        
         dialogue_id, idx = (
             "_".join(b["dialogue_ids"].split("_")[:-1]),
             int(b["dialogue_ids"].split("_")[-1]) + 1,
