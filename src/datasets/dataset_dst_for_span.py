@@ -23,7 +23,7 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
 
                 # Currently, only new spans added in this turn will be added...
                 slot_start_ends = {
-                    s["slot"]: (s["start"], s["exclusive_end"] - 1)
+                    s["slot"]: (s["start"], s["exclusive_end"])
                     for s in frame["slots"]
                     if "start" in s and "exclusive_end" in s
                 }
