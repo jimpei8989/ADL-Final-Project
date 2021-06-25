@@ -40,6 +40,7 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
 
     def check_data(self, dialogue, other):
         assert len(other[1]) > 0
+        assert all(service in dialogue["services"] for service, slot in other[1])
 
     def form_data(self, dialogue, other) -> dict:
         turn_idx, categorical_pairs = other

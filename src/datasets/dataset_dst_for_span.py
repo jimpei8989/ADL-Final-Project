@@ -47,6 +47,9 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
 
     def check_data(self, dialogue, other):
         assert len(other[1]) > 0
+        assert all(
+            service in dialogue["services"] for service, slot, start, exclusive_end in other[1]
+        )
 
     def form_data(self, dialogue, other) -> dict:
         turn_idx, span_pairs = other
