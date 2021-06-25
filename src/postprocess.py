@@ -171,7 +171,7 @@ if __name__ == "__main__":
         if args.clean:
             tmp = {
                 "start": " ".join(b["beginning"]),
-                "mod": ""
+                "mod": "",
                 "end": " ".join(e["end"]),
             }
         else:
@@ -181,7 +181,7 @@ if __name__ == "__main__":
                 "mod": b["system"],  # need to be empty
                 "end": " ".join(e["end"]),
             }
-        
+
         dialogue_id, idx = (
             "_".join(b["dialogue_ids"].split("_")[:-1]),
             int(b["dialogue_ids"].split("_")[-1]) + 1,
