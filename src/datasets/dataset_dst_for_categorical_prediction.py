@@ -1,32 +1,29 @@
-from typing import Any, List
+from typing import Any, Dict, List
 
 from datasets.dataset_dst import DSTDatasetForDST
 
 
-class DSTDatasetForDSTForPrediction(DSTDatasetForDST):
+class DSTDatasetForDSTForCategoricalPrediction(DSTDatasetForDST):
     def __init__(
         self,
         *args,
-        last_user_turn_only: bool = False,
+        dialogue_to_others: Dict[str, List[Any]],
         **kwargs,
     ):
-        self.last_user_turn_only = last_user_turn_only
+        self.dialogue_to_others = dialogue_to_others
 
         super().__init__(*args, **kwargs)
 
     def expand(self, dialogue) -> List[Any]:
+        if dialogue["dialogue_id"] not in self.dialogue_to_others:
+            return []
+
         ret = []
+        for turn_idx, service_name, slot_name in self.dialogue_to_others[dialogue["dialogue_id"]]:
+            slot = self.schema.service_by_name[service_name].slot_by_name[slot_name]
 
-        turn_indices = (
-            [len(dialogue["turns"]) - 2]
-            if self.last_user_turn_only
-            else range(0, len(dialogue["turns"]), 2)
-        )
-
-        for turn_idx in turn_indices:
-            for service_name in dialogue["services"]:
-                for slot in self.schema.service_by_name[service_name].slots:
-                    ret.append((turn_idx, service_name, slot.name))
+            for answer in slot.possible_values:
+                ret.append((turn_idx, service_name, slot_name, answer))
 
         return ret
 
@@ -34,7 +31,7 @@ class DSTDatasetForDSTForPrediction(DSTDatasetForDST):
         return True
 
     def form_data(self, dialogue, other) -> dict:
-        turn_idx, service_name, slot_name = other
+        turn_idx, service_name, slot_name, answer = other
 
         service = self.schema.service_by_name[service_name]
         slot = service.slot_by_name[slot_name]
@@ -42,10 +39,12 @@ class DSTDatasetForDSTForPrediction(DSTDatasetForDST):
         ret = self._form_data(
             dialogue=dialogue,
             turns=dialogue["turns"][: turn_idx + 1],
-            latter=f" {self.tokenizer.sep_token} ".join([service.description, slot.description]),
+            latter=f" {self.tokenizer.sep_token} ".join(
+                [service.description, slot.description, answer]
+            ),
             max_length=self.max_seq_length,
         )
-        ret.update({"_key": (dialogue["dialogue_id"], *other)})
+        ret.update({"answer": answer, "_key": (dialogue["dialogue_id"], *other)})
         return ret
 
 
@@ -58,7 +57,7 @@ if __name__ == "__main__":
     tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
     schema = Schema.load_json(Path("../dataset/data/schema.json"))
 
-    dataset = DSTDatasetForDSTForPrediction(
+    dataset = DSTDatasetForDSTForCategoricalPrediction(
         Path("../dataset/data/test_seen"),
         schema=schema,
         tokenizer=tokenizer,
