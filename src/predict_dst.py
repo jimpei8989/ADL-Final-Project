@@ -4,6 +4,8 @@ from typing import List, Tuple, Optional
 
 import pandas as pd
 import torch
+import torch.nn.functional as nnf
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoTokenizer, BatchEncoding, PreTrainedTokenizerBase
 from transformers.trainer_utils import set_seed
@@ -42,7 +44,18 @@ def main(args):
     if args.system_token is not None:
         tokenizer.add_special_tokens({"additional_special_tokens": [args.system_token]})
 
-    dataset = DSTDatasetForDSTForPrediction(json_dir=args.test_data_dir, test_mode=args.test_mode)
+    slot_dataset = DSTDatasetForDSTForPrediction(
+        json_dir=args.test_data_dir,
+        schema=schema,
+        tokenizer=tokenizer,
+        max_seq_length=512 - 10,  # TODO: extract from tokenizer
+        user_token=args.user_token,
+        system_token=args.system_token,
+        test_mode=args.test_mode,
+    )
+    slot_dataloader = DataLoader(
+        slot_dataset, batch_size=args.batch_size, num_workers=args.num_workers
+    )
 
     model = DSTModel.from_pretrained(
         args.pretrained_path, model_name=args.model_name_or_path, device=args.device
@@ -50,138 +63,15 @@ def main(args):
     model.to(args.device)
     model.eval()
 
-    def form_utterance(
-        turns,
-        max_length: Optional[int] = None,
-        user_token: Optional[str] = None,
-        system_token: Optional[str] = None,
-    ):
-        cur_length, turn_idx = 0, len(turns) - 1
-        utterances = []
+    slot_outputs = {}  # (dialogue_id, turn_idx) -> model_output)
+    with torch.no_grad():
+        for batch in tqdm(slot_dataloader, ncols=99, desc="Predicting slots"):
+            batch_output = model(batch["input_ids"].to(args.device))
 
-        while turn_idx >= 0:
-            turn = turns[turn_idx]
-            special_token = user_token if turn["speaker"] == "USER" else system_token
-            utterance = (f"{special_token} " if special_token else "") + turn["utterance"]
-
-            tokenized = tokenizer.tokenize(utterance)
-            if max_length is not None and cur_length + len(tokenized) > max_length:
-                break
-            else:
-                utterances.append(utterance)
-                cur_length += len(tokenized)
-                turn_idx -= 1
-        return " ".join(utterances[::-1])
-
-    def form_input(
-        turns,
-        slot_description: str,
-        answer: Optional[str] = None,
-        max_length: Optional[int] = None,
-        user_token: Optional[str] = None,
-        system_token: Optional[str] = None,
-    ) -> Tuple[str, BatchEncoding]:
-        # [CLS] utterance [SEP] slot [SEP] answer [SEP]
-        latter = (
-            slot_description
-            if answer is None
-            else " ".join([slot_description, tokenizer.sep_token, answer])
-        )
-        latter_len = len(tokenizer.tokenize(latter))
-
-        utterance = form_utterance(
-            turns,
-            max_length=(max_length - latter_len if max_length is not None else None),
-            user_token=user_token,
-            system_token=system_token,
-        )
-
-        return (utterance, latter), tokenizer([utterance], [latter], return_tensors="pt")
-
-    # TODO: add max_length and user/system token to argparser and adapt to main
-    def predict_single(
-        dialogue,
-        max_length: Optional[int] = None,
-        user_token: Optional[str] = None,
-        system_token: Optional[str] = None,
-    ) -> Tuple[str, List[Tuple[str, str]]]:
-        service_slot_pairs = [
-            (schema.service_by_name[service], slot)
-            for service in dialogue["services"]
-            for slot in schema.service_by_name[service].slots
-        ]
-
-        states = {}
-        for service, slot in service_slot_pairs:
-            for i in range(0, len(dialogue["turns"]), 2):
-                (utterance, _), encoded = form_input(
-                    dialogue["turns"][: i + 1],
-                    slot_description=slot.description,
-                    max_length=max_length,
-                    user_token=user_token,
-                    system_token=system_token,
-                )
-                outputs = model(input_ids=encoded.input_ids.to(args.device))
-
-                if outputs.slot_logits[0] > 0:
-                    state_value = None
-                    if slot.is_categorical:
-                        scores = {}
-                        for value in slot.possible_values:
-                            (_, _), _encoded = form_input(
-                                dialogue["turns"],
-                                slot_description=slot.description,
-                                answer=value,
-                                max_length=max_length,
-                                user_token=user_token,
-                                system_token=system_token,
-                            )
-                            _outputs = model(_encoded.input_ids.to(args.device))
-                            scores.update({value: _outputs.value_logits[0].item()})
-
-                        state_value = max(scores.items(), key=lambda p: p[1])[0]
-                    else:
-                        begin_index = outputs.begin_logits[0].argmax()
-                        end_index = outputs.end_logits[0].argmax()
-
-                        if (
-                            begin_index > end_index
-                            or encoded.token_to_sequence(0, begin_index) != 0
-                            or encoded.token_to_sequence(0, end_index) != 0
-                        ):
-                            # if the answer is in the latter part, drop this
-                            state_value = None
-                        else:
-                            begin_char_index = encoded.token_to_chars(begin_index).start
-                            end_char_index = encoded.token_to_chars(end_index).end
-                            state_value = utterance[begin_char_index : end_char_index + 1].strip(
-                                STRIP_CHARS
-                            )
-
-                    if state_value is not None:
-                        states[f"{service.name}-{slot.name}"] = state_value
-
-        return dialogue["dialogue_id"], list(states.items())
-
-    predictions = []
-
-    for sample in tqdm(dataset, ncols=99, desc="Predicting"):
-        prediction = predict_single(
-            sample,
-            max_length=model.max_position_embeddings - 10,
-            user_token=args.user_token,
-            system_token=args.system_token,
-        )
-        predictions.append(prediction)
-
-    IDs, states = zip(*sorted(predictions))
-    states = list(
-        map(
-            lambda state: "None" if len(state) == 0 else "|".join(f"{a}={b}" for a, b in state),
-            states,
-        )
-    )
-    pd.DataFrame({"id": IDs, "state": states}).to_csv(args.prediction_csv, index=False)
+            for i in range(batch["input_ids"].shape[0]):
+                slot_outputs[
+                    (batch["dialogue_id"][i], batch["service"][i], batch["slot"][i])
+                ] = batch_output.logits_by_index(i)
 
 
 def parse_args():
@@ -201,6 +91,7 @@ def parse_args():
 
     # Prediction
     parser.add_argument("--prediction_csv", type=Path, default="prediction.csv")
+    parser.add_argument("--max_span_length", type=int, default=32)
 
     # Misc
     parser.add_argument("--no_gpu", dest="gpu", action="store_false")

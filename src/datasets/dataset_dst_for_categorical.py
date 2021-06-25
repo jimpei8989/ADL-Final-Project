@@ -1,89 +1,78 @@
 import random
 
-import torch
+from typing import Any, List
+
 
 from datasets.dataset_dst import DSTDatasetForDST
+from datasets.utils import draw_from_list
 
 
 class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
-    def __init__(self, *args, negative_ratio=1.0, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args, negative_ratio=1.0, last_user_turn_only: bool = False, **kwargs):
         self.negative_ratio = negative_ratio
+        self.last_user_turn_only = last_user_turn_only
 
-    def __len__(self):
-        return super().__len__()
+        super().__init__(*args, **kwargs)
 
-    def check_item(self, index):
-        dialogue, turn_idx = super().__getitem__(index)
-        turn = dialogue["turns"][turn_idx]
+    def expand(self, dialogue) -> List[Any]:
+        ret = []
 
-        candidates = [
-            (service, slot)
-            for service, slot in self.get_positive_service_slot_names(turn)
-            if self.schema.service_by_name[service].slot_by_name[slot].is_categorical
-        ]
+        turn_indices = (
+            [len(dialogue["turns"]) - 2]
+            if self.last_user_turn_only
+            else range(0, len(dialogue["turns"]), 2)
+        )
 
-        assert len(candidates) > 0
+        for turn_idx in turn_indices:
+            turn = dialogue["turns"][turn_idx]
+            assert turn["speaker"] == "USER"
 
-    def __getitem__(self, index: int):
-        dialogue, turn_idx = super().__getitem__(index)
-        turn = dialogue["turns"][turn_idx]
+            categorical_pairs = [
+                (frame["service"], slot)
+                for frame in turn["frames"]
+                for slot in frame["state"]["slot_values"]
+                if self.schema.service_by_name[frame["service"]].slot_by_name[slot].is_categorical
+            ]
 
-        candidates = [
-            (service, slot)
-            for service, slot in self.get_positive_service_slot_names(turn)
-            if self.schema.service_by_name[service].slot_by_name[slot].is_categorical
-        ]
+            ret.append((turn_idx, categorical_pairs))
 
-        chosen_idx = int(random.random() * len(candidates))
-        service_name, slot_name = candidates[chosen_idx]
+        return ret
 
-        slot = self.schema.service_by_name[service_name].slot_by_name[slot_name]
+    def check_data(self, dialogue, other):
+        assert len(other[1]) > 0
 
-        the_frame = next(filter(lambda f: f["service"] == service_name, turn["frames"]))
-        correct_answer = the_frame["state"]["slot_values"][slot_name][0]
+    def form_data(self, dialogue, other) -> dict:
+        turn_idx, categorical_pairs = other
 
-        positive = int(random.random() * (1 + self.negative_ratio) < 1.0)
+        positive = float(random.random() * (1 + self.negative_ratio) < 1.0)
+        service_name, slot_name = draw_from_list(categorical_pairs)
+
+        service = self.schema.service_by_name[service_name]
+        slot = service.slot_by_name[slot_name]
+
+        the_frame = next(
+            filter(lambda f: f["service"] == service_name, dialogue["turns"][turn_idx]["frames"])
+        )
+        correct = the_frame["state"]["slot_values"][slot_name][0]
+
         if positive:
-            value = correct_answer
+            value = correct
         else:
-            incorrect_answers = [v for v in slot.possible_values if v != correct_answer]
-            if len(incorrect_answers) == 0:
-                print(slot.possible_values)
-            value = incorrect_answers[int(random.random() * len(incorrect_answers))]
+            value = draw_from_list([ans for ans in slot.possible_values if ans != correct])
 
-        slot_tokens = (
-            self.tokenizer.tokenize(self.schema.service_by_name[service_name].description)
-            + [self.tokenizer.sep_token]
-            + self.tokenizer.tokenize(slot.description)
-            + [self.tokenizer.sep_token]
-            + self.tokenizer.tokenize(value)
+        ret = {"type": 1}
+        ret.update(
+            self._form_data(
+                dialogue=dialogue,
+                turns=dialogue["turns"][: turn_idx + 1],
+                latter=f" {self.tokenizer.sep_token} ".join(
+                    [service.description, slot.description, value]
+                ),
+                max_length=self.max_seq_length,
+            )
         )
-
-        utterance = self.get_utterance_tokens(
-            dialogue, turn_idx, max_length=self.max_seq_length - len(slot_tokens) - 3
-        )
-
-        input_ids = self.tokenizer(
-            self.tokenizer.convert_tokens_to_string(utterance),
-            self.tokenizer.convert_tokens_to_string(slot_tokens),
-            padding="max_length",
-            max_length=512,
-        ).input_ids
-        # if (len(input_ids)) > self.max_seq_length:
-        #     print(f"type: {type}")
-        #     print(f"utterance: {utterance}")
-        #     print(f"utterance len: {len(utterance)}")
-        #     print(f"slot: {slot_tokens}")
-        #     print(f"slot len: {len(slot_tokens)}")
-        #     print(f"inputs: {self.tokenizer.convert_ids_to_tokens(input_ids)}")
-        #     print(f"inputs len: {len(input_ids)}")
-        #     print(f"turn: {turn}")
-        return {
-            "type": 1,
-            "input_ids": torch.as_tensor(input_ids, dtype=torch.long),
-            "value_labels": float(positive),
-        }
+        ret.update({"value_labels": positive})
+        return ret
 
 
 if __name__ == "__main__":
