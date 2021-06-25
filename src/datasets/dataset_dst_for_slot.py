@@ -46,6 +46,9 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
 
     def check_data(self, dialogue, other):
         assert all(len(obj) > 0 for obj in other[1:])
+        assert all(
+            service in dialogue["services"] for pairs in other[1:] for service, slot in pairs
+        )
 
     def form_data(self, dialogue, other) -> dict:
         turn_idx, positive_pairs, negative_pairs = other
