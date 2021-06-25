@@ -43,16 +43,19 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
     def form_data(self, dialogue, other) -> dict:
         turn_idx, span_pairs = other
 
-        service, slot_name, start, end = draw_from_list(span_pairs)
+        service_name, slot_name, start, end = draw_from_list(span_pairs)
 
-        slot = self.schema.service_by_name[service].slot_by_name[slot_name]
+        service = self.schema.service_by_name[service_name]
+        slot = service.slot_by_name[slot_name]
 
         ret = {"type": 2}
         ret.update(
             self._form_data(
                 dialogue=dialogue,
                 turns=dialogue["turns"][: turn_idx + 1],
-                latter=slot.description,
+                latter=f" {self.tokenizer.sep_token} ".join(
+                    [service.description, slot.description]
+                ),
                 max_length=self.max_seq_length,
                 begin_str_idx=start,
                 end_str_idx=end,

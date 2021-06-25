@@ -36,9 +36,10 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
         turn_idx, categorical_pairs = other
 
         positive = float(random.random() * (1 + self.negative_ratio) < 1.0)
-        service, slot_name = draw_from_list(categorical_pairs)
+        service_name, slot_name = draw_from_list(categorical_pairs)
 
-        slot = self.schema.service_by_name[service].slot_by_name[slot_name]
+        service = self.schema.service_by_name[service_name]
+        slot = service.slot_by_name[slot_name]
 
         the_frame = next(
             filter(lambda f: f["service"] == service, dialogue["turns"][turn_idx]["frames"])
@@ -55,7 +56,9 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
             self._form_data(
                 dialogue=dialogue,
                 turns=dialogue["turns"][: turn_idx + 1],
-                latter=f" {self.tokenizer.sep_token} ".join([slot.description, value]),
+                latter=f" {self.tokenizer.sep_token} ".join(
+                    [service.description, slot.description, value]
+                ),
                 max_length=self.max_seq_length,
             )
         )

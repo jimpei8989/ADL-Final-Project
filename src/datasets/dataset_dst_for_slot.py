@@ -43,14 +43,19 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
         turn_idx, positive_pairs, negative_pairs = other
 
         positive = float(random.random() * (1 + self.negative_ratio) < 1.0)
-        service, slot = draw_from_list(positive_pairs if positive else negative_pairs)
+        service_name, slot_name = draw_from_list(positive_pairs if positive else negative_pairs)
+
+        service = self.schema.service_by_name[service_name]
+        slot = service.slot_by_name[slot_name]
 
         ret = {"type": 0}
         ret.update(
             self._form_data(
                 dialogue=dialogue,
                 turns=dialogue["turns"][: turn_idx + 1],
-                latter=self.schema.service_by_name[service].slot_by_name[slot].description,
+                latter=f" {self.tokenizer.sep_token} ".join(
+                    [service.description, slot.description]
+                ),
                 max_length=self.max_seq_length,
             )
         )
