@@ -6,14 +6,22 @@ from datasets.utils import draw_from_list
 
 
 class DSTDatasetForDSTForSpan(DSTDatasetForDST):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, last_user_turn_only: bool = False, **kwargs):
+        self.last_user_turn_only = last_user_turn_only
+
         super().__init__(*args, **kwargs)
 
     def expand(self, dialogue) -> List[Any]:
         ret = []
-        for turn_idx in range(0, len(dialogue["turns"]), 2):
-            turn = dialogue["turns"][turn_idx]
 
+        turn_indices = (
+            [len(dialogue["turns"]) - 2]
+            if self.last_user_turn_only
+            else range(0, len(dialogue["turns"]), 2)
+        )
+
+        for turn_idx in turn_indices:
+            turn = dialogue["turns"][turn_idx]
             assert turn["speaker"] == "USER"
 
             span_pairs = []
@@ -27,7 +35,6 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
                     for s in frame["slots"]
                     if "start" in s and "exclusive_end" in s
                 }
-
                 span_pairs.extend(
                     (service, k, *v)
                     for k, v in slot_start_ends.items()
@@ -35,6 +42,7 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
                 )
 
             ret.append((turn_idx, span_pairs))
+
         return ret
 
     def check_data(self, dialogue, other):

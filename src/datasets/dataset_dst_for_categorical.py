@@ -8,15 +8,23 @@ from datasets.utils import draw_from_list
 
 
 class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
-    def __init__(self, *args, negative_ratio=1.0, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args, negative_ratio=1.0, last_user_turn_only: bool = False, **kwargs):
         self.negative_ratio = negative_ratio
+        self.last_user_turn_only = last_user_turn_only
+
+        super().__init__(*args, **kwargs)
 
     def expand(self, dialogue) -> List[Any]:
         ret = []
-        for turn_idx in range(0, len(dialogue["turns"]), 2):
-            turn = dialogue["turns"][turn_idx]
 
+        turn_indices = (
+            [len(dialogue["turns"]) - 2]
+            if self.last_user_turn_only
+            else range(0, len(dialogue["turns"]), 2)
+        )
+
+        for turn_idx in turn_indices:
+            turn = dialogue["turns"][turn_idx]
             assert turn["speaker"] == "USER"
 
             categorical_pairs = [
@@ -27,6 +35,7 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
             ]
 
             ret.append((turn_idx, categorical_pairs))
+
         return ret
 
     def check_data(self, dialogue, other):

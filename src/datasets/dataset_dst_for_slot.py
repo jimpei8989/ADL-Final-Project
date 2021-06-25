@@ -7,14 +7,24 @@ from datasets.utils import draw_from_list
 
 
 class DSTDatasetForDSTForSlot(DSTDatasetForDST):
-    def __init__(self, *args, negative_ratio: float = 1.0, **kwargs):
+    def __init__(
+        self, *args, negative_ratio: float = 1.0, last_user_turn_only: bool = False, **kwargs
+    ):
         self.negative_ratio = negative_ratio
+        self.last_user_turn_only = last_user_turn_only
 
         super().__init__(*args, **kwargs)
 
     def expand(self, dialogue) -> List[Any]:
         ret = []
-        for turn_idx in range(0, len(dialogue["turns"]), 2):
+
+        turn_indices = (
+            [len(dialogue["turns"]) - 2]
+            if self.last_user_turn_only
+            else range(0, len(dialogue["turns"]), 2)
+        )
+
+        for turn_idx in turn_indices:
             turn = dialogue["turns"][turn_idx]
             assert turn["speaker"] == "USER"
 
@@ -23,13 +33,11 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
                 for service in dialogue["services"]
                 for slot in self.schema.service_by_name[service].slot_by_name
             ]
-
             positive_pairs = [
                 (frame["service"], slot)
                 for frame in turn["frames"]
                 for slot in frame["state"]["slot_values"]
             ]
-
             negative_pairs = list(set(all_pairs) - set(positive_pairs))
 
             ret.append((turn_idx, positive_pairs, negative_pairs))
