@@ -42,7 +42,7 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
         slot = service.slot_by_name[slot_name]
 
         the_frame = next(
-            filter(lambda f: f["service"] == service, dialogue["turns"][turn_idx]["frames"])
+            filter(lambda f: f["service"] == service_name, dialogue["turns"][turn_idx]["frames"])
         )
         correct = the_frame["state"]["slot_values"][slot_name][0]
 
