@@ -11,32 +11,11 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
         self,
         *args,
         negative_ratio: float = 1.0,
-        last_user_turn_only: bool = False,
-        strategy: str = "turn",
-        reserved_for_latter: int = 48,
-        overlap_turns: int = 4,
-        ensure_user_on_both_ends: bool = True,
         **kwargs,
     ):
         self.negative_ratio = negative_ratio
-        self.last_user_turn_only = last_user_turn_only
-        self.strategy = strategy
-        self.reserved_for_latter = reserved_for_latter
-        self.overlap_turns = overlap_turns
-        self.ensure_user_on_both_ends = ensure_user_on_both_ends
 
         super().__init__(*args, **kwargs)
-
-    def before_expand(self) -> None:
-        self.former_max_len = self.max_seq_length - self.reserved_for_latter
-
-    def expand(self, dialogue):
-        if self.strategy == "turn":
-            return self.expand1(dialogue)
-        elif self.strategy == "segment":
-            return self.expand2(dialogue)
-        else:
-            raise ValueError
 
     def expand1(self, dialogue) -> List[Any]:
         ret = []

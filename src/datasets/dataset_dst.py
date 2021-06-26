@@ -15,6 +15,13 @@ class DSTDatasetForDST(DSTDataset):
         user_token: Optional[str] = None,
         system_token: Optional[str] = None,
         test_mode: bool = False,
+        strategy: str = "turn",
+        # Strategy 1
+        last_user_turn_only: bool = False,
+        # Strategy 2
+        reserved_for_latter: int = 48,
+        overlap_turns: int = 4,
+        ensure_user_on_both_ends: bool = True,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -29,6 +36,16 @@ class DSTDatasetForDST(DSTDataset):
         logger.info(f"Successfully loaded {len(self.data)} dialogues...")
         self.data = sorted(self.data, key=lambda d: d["dialogue_id"])
         self.dialogue_by_id = {d["dialogue_id"]: d for d in self.data}
+
+        self.strategy = strategy
+
+        # Strategy 1
+        self.last_user_turn_only = last_user_turn_only
+
+        # Strategy 2
+        self.former_max_len = self.max_seq_length - reserved_for_latter
+        self.overlap_turns = overlap_turns
+        self.ensure_user_on_both_ends = ensure_user_on_both_ends
 
         self.expanded = {}  # dialogue_id -> Any
         self.prefix_sum = [0]
@@ -63,6 +80,18 @@ class DSTDatasetForDST(DSTDataset):
         pass
 
     def expand(self, dialogue) -> List[Any]:
+        if self.strategy == "turn":
+            return self.expand1(dialogue)
+        elif self.strategy == "segment":
+            return self.expand2(dialogue)
+        else:
+            raise ValueError
+        return [None]
+
+    def expand1(self, dialogue) -> List[Any]:
+        return [None]
+
+    def expand2(self, dialogue) -> List[Any]:
         return [None]
 
     def get_dialogue_and_other(self, index):
