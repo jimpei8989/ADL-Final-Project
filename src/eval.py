@@ -33,7 +33,7 @@ def eval(args):
             for t in dialogue["turns"]:
                 if t["speaker"] == "SYSTEM":
                     continue
-                for frame in t["frames"]:
+                for frame in t["frames"][-2:-1]:
                     for k, v in frame["state"]["slot_values"].items():
                         state[f"{frame['service']}-{k}"] = v[0]
             labels[dialogue["dialogue_id"]] = dict(state)
