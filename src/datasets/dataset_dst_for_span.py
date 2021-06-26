@@ -76,7 +76,7 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
                     cur_token_cnt += turn_token_len
 
             if self.ensure_user_on_both_ends:
-                if cursor % 2 == 0:
+                if cursor % 2 == 1:
                     cursor -= 1
 
             span_pairs = [
