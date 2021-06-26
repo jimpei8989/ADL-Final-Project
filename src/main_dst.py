@@ -35,8 +35,8 @@ def compute_metrics(eval_pred):
 
 def parse_args() -> Namespace:
     parser = ArgumentParser()
-    parser.add_argument("--train_data_dir", type=Path, default="dataset/data-0614/train/")
-    parser.add_argument("--eval_data_dir", type=Path, default="dataset/data-0614/dev/")
+    parser.add_argument("--train_data_dir", type=Path, default="dataset/data-0625/train/")
+    parser.add_argument("--eval_data_dir", type=Path, default="dataset/data-0625/dev/")
     parser.add_argument("--schema_json", type=Path, default="dataset/data/schema.json")
     parser.add_argument("--ckpt_dir", type=Path, default="./ckpt/DST/default/")
 
