@@ -136,6 +136,7 @@ class DSTDatasetForDST(DSTDataset):
         turns: list,
         latter: str,
         max_length: Optional[int] = None,
+        relative_turn_idx: int = -1,
         begin_str_idx: Optional[int] = None,
         end_str_idx: Optional[int] = None,
     ) -> dict:
@@ -146,7 +147,9 @@ class DSTDatasetForDST(DSTDataset):
         utterances = self.form_utterances(turns, max_length=max_length - latter_token_len - 3 - 10)
 
         if begin_str_idx is not None and end_str_idx is not None:
-            offset = sum(len(u) for u in utterances[:-1]) + len(utterances) - 1
+            offset = (
+                sum(len(u) + 1 for u in utterances[:relative_turn_idx])
+            )
             if self.user_token:
                 offset += len(self.user_token) + 1
 
