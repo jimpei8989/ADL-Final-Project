@@ -35,7 +35,7 @@ class DSTDatasetForDST(DSTDataset):
 
         self.before_expand()
 
-        for dialogue in self.data:
+        for dialogue in tqdmm(self.data, desc="Expanding dataset"):
             did = dialogue["dialogue_id"]
             self.expanded[did] = self.expand(dialogue)
             self.prefix_sum.append(self.prefix_sum[-1] + len(self.expanded[did]))
@@ -151,6 +151,17 @@ class DSTDatasetForDST(DSTDataset):
 
         return ret
 
+    def form_turn(self, turn):
+        utterance = turn["utterance"]
+
+        special_token = self.user_token if turn["speaker"] == "USER" else self.system_token
+        if special_token is not None:
+            utterance = special_token + " " + utterance
+
+        utterance_tokens = self.tokenizer.tokenize(utterance)
+
+        return utterance, utterance_tokens
+
     def form_utterances(
         self,
         turns: List,
@@ -159,13 +170,7 @@ class DSTDatasetForDST(DSTDataset):
         cur_len, utterances = 0, []
 
         for turn in turns[::-1]:
-            utterance = turn["utterance"]
-
-            special_token = self.user_token if turn["speaker"] == "USER" else self.system_token
-            if special_token is not None:
-                utterance = special_token + " " + utterance
-
-            utterance_tokens = self.tokenizer.tokenize(utterance)
+            utterance, utterance_tokens = self.form_turn(turn)
 
             if cur_len + len(utterance_tokens) > max_length:
                 break
