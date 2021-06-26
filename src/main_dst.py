@@ -56,7 +56,7 @@ def parse_args() -> Namespace:
     parser.add_argument("--no_adafactor", action="store_true", default=False)
     parser.add_argument("--no_fp16", action="store_true", default=False)
     parser.add_argument("--num_epoch", type=int, default=100)
-    parser.add_argument("--early_stopping", type=int, default=5)
+    parser.add_argument("--early_stopping", type=int, default=3)
 
     args = parser.parse_args()
     args.seed %= 2 ** 32
