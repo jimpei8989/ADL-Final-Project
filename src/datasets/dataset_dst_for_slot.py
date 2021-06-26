@@ -73,16 +73,16 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
                 if cursor % 2 == 1:
                     cursor -= 1
 
-            positive_pairs = [
+            positive_pairs = set(
                 (frame["service"], slot)
                 for turn in turns[begin_turn_idx : cursor + 1]
                 if turn["speaker"] == "USER"
                 for frame in turn["frames"]
                 for slot in frame["state"]["slot_values"]
-            ]
-            negative_pairs = list(all_pairs - set(positive_pairs))
+            )
+            negative_pairs = all_pairs - positive_pairs
 
-            ret.append((begin_turn_idx, cursor, positive_pairs, negative_pairs))
+            ret.append((begin_turn_idx, cursor, list(positive_pairs), list(negative_pairs)))
 
             if cursor >= len(dialogue["turns"]) - 2:
                 break

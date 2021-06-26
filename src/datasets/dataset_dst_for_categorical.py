@@ -49,12 +49,28 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
 
         while True:
             cur_token_cnt = 0
+            categorical_pairs = {}  # (service, slot) -> correct answer
+
             while cursor < len(turns):
-                turn_token_len = len(self.form_turn(turns[cursor])[1])
+                turn = turns[cursor]
+                turn_token_len = len(self.form_turn(turn)[1])
 
                 if cur_token_cnt + turn_token_len > self.former_max_len:
                     break
                 else:
+
+                    if turn["speaker"] == "USER":
+                        categorical_pairs.update(
+                            {
+                                (frame["service"], slot): frame["state"]["slot_values"][slot][0]
+                                for frame in turn["frames"]
+                                for slot in frame["state"]["slot_values"]
+                                if self.schema.service_by_name[frame["service"]]
+                                .slot_by_name[slot]
+                                .is_categorical
+                            }
+                        )
+
                     cursor += 1
                     cur_token_cnt += turn_token_len
 
@@ -62,14 +78,7 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
                 if cursor % 2 == 1:
                     cursor -= 1
 
-            categorical_pairs = [
-                (frame["service"], slot, frame["state"]["slot_values"][slot][0])
-                for turn in turns[begin_turn_idx : cursor + 1]
-                if turn["speaker"] == "USER"
-                for frame in turn["frames"]
-                for slot in frame["state"]["slot_values"]
-                if self.schema.service_by_name[frame["service"]].slot_by_name[slot].is_categorical
-            ]
+            categorical_pairs = [(*k, v) for k, v in categorical_pairs.items()]
 
             ret.append((begin_turn_idx, cursor, categorical_pairs))
 
