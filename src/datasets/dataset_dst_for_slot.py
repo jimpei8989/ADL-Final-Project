@@ -17,12 +17,12 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
 
         super().__init__(*args, **kwargs)
 
-    def extract_positive_slots(self, turn) -> set:
-        return set(
-            (frame["service"], slot)
+    def extract_positive_slots(self, turn) -> dict:
+        return {
+            (frame["service"], slot): frame["state"]["slot_values"][slot]
             for frame in turn["frames"]
             for slot in frame["state"]["slot_values"]
-        )
+        }
 
     def expand1(self, dialogue) -> List[Any]:
         ret = []
@@ -43,7 +43,7 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
             turn = dialogue["turns"][turn_idx]
             assert turn["speaker"] == "USER"
 
-            positive_pairs = self.extract_positive_slots(turn)
+            positive_pairs = set(self.extract_positive_slots(turn).keys())
             negative_pairs = all_pairs - positive_pairs
 
             ret.append((0, turn_idx, list(positive_pairs), list(negative_pairs)))
@@ -63,6 +63,17 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
 
         while True:
             cur_token_cnt = 0
+
+            if begin_turn_idx >= 2:
+                user_before_begin = (
+                    turns[begin_turn_idx - 1]
+                    if turns[begin_turn_idx - 1]["speaker"] == "USER"
+                    else turns[begin_turn_idx - 2]
+                )
+                dont_want = self.extract_positive_slots(user_before_begin)
+            else:
+                dont_want = {}
+
             while cursor < len(turns):
                 turn_token_len = len(self.form_turn(turns[cursor])[1])
 
@@ -78,23 +89,18 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
                 if cursor % 2 == 1:
                     cursor -= 1
 
-            if begin_turn_idx >= 2:
-                user_before_begin = (
-                    turns[begin_turn_idx - 1]
-                    if turns[begin_turn_idx - 1]["speaker"] == "USER"
-                    else turns[begin_turn_idx - 2]
-                )
-                dont_want = self.extract_positive_slots(user_before_begin)
-            else:
-                dont_want = set()
-
             last_user_turn = (
                 turns[cursor] if turns[cursor]["speaker"] == "USER" else turns[cursor - 1]
             )
 
-            positive_pairs = self.extract_positive_slots(last_user_turn) - dont_want
-            negative_pairs = all_pairs - positive_pairs
+            positive_pairs = self.extract_positive_slots(last_user_turn)
 
+            for k in dont_want:
+                if k in positive_pairs and positive_pairs[k] == dont_want[k]:
+                    del positive_pairs[k]
+
+            positive_pairs = set(positive_pairs.keys())
+            negative_pairs = all_pairs - positive_pairs
             ret.append((begin_turn_idx, cursor, list(positive_pairs), list(negative_pairs)))
 
             if cursor >= len(dialogue["turns"]) - 2:
@@ -107,9 +113,7 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
 
     def check_data(self, dialogue, other):
         assert all(len(obj) > 0 for obj in other[2:])
-        assert all(
-            service in dialogue["services"] for pairs in other[2:] for service, _ in pairs
-        )
+        assert all(service in dialogue["services"] for pairs in other[2:] for service, _ in pairs)
 
     def form_data(self, dialogue, other) -> dict:
         begin_turn_idx, end_turn_idx, positive_pairs, negative_pairs = other
