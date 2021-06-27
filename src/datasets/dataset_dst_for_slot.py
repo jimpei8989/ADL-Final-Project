@@ -19,7 +19,7 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
 
     def extract_positive_slots(self, turn) -> dict:
         return {
-            (frame["service"], slot): frame["state"]["slot_values"][slot]
+            (frame["service"], slot): frame["state"]["slot_values"][slot][0]
             for frame in turn["frames"]
             for slot in frame["state"]["slot_values"]
         }
