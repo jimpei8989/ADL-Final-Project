@@ -78,16 +78,11 @@ class DSTTrainer(Trainer):
                         labels = inputs[label_type]
                         if len(pred.shape) > 1:
                             ret[label_type][0] += (
-                                (torch.argmax(pred, dim=-1) == labels)
-                                .float()
-                                .mean()
-                                .item()
+                                (torch.argmax(pred, dim=-1) == labels).float().mean().item()
                             )
                         else:
                             pred = torch.nn.Sigmoid()(pred)
-                            ret[label_type][0] += (
-                                ((pred > 0.5) == labels).float().mean().item()
-                            )
+                            ret[label_type][0] += ((pred > 0.5) == labels).float().mean().item()
                         ret[label_type][1] += 1
 
             for key in list(ret.keys()):
@@ -104,5 +99,4 @@ class DSTTrainer(Trainer):
             )
             self._memory_tracker.stop_and_update_metrics(ret)
 
-        print(ret)
         return ret
