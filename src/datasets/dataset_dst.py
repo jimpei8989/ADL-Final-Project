@@ -15,6 +15,13 @@ class DSTDatasetForDST(DSTDataset):
         user_token: Optional[str] = None,
         system_token: Optional[str] = None,
         test_mode: bool = False,
+        strategy: str = "turn",
+        # Strategy 1
+        last_user_turn_only: bool = False,
+        # Strategy 2
+        reserved_for_latter: int = 48,
+        overlap_turns: int = 4,
+        ensure_user_on_both_ends: bool = True,
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
@@ -30,12 +37,22 @@ class DSTDatasetForDST(DSTDataset):
         self.data = sorted(self.data, key=lambda d: d["dialogue_id"])
         self.dialogue_by_id = {d["dialogue_id"]: d for d in self.data}
 
+        self.strategy = strategy
+
+        # Strategy 1
+        self.last_user_turn_only = last_user_turn_only
+
+        # Strategy 2
+        self.former_max_len = self.max_seq_length - reserved_for_latter
+        self.overlap_turns = overlap_turns
+        self.ensure_user_on_both_ends = ensure_user_on_both_ends
+
         self.expanded = {}  # dialogue_id -> Any
         self.prefix_sum = [0]
 
         self.before_expand()
 
-        for dialogue in self.data:
+        for dialogue in tqdmm(self.data, desc="Expanding dataset"):
             did = dialogue["dialogue_id"]
             self.expanded[did] = self.expand(dialogue)
             self.prefix_sum.append(self.prefix_sum[-1] + len(self.expanded[did]))
@@ -63,6 +80,18 @@ class DSTDatasetForDST(DSTDataset):
         pass
 
     def expand(self, dialogue) -> List[Any]:
+        if self.strategy == "turn":
+            return self.expand1(dialogue)
+        elif self.strategy == "segment":
+            return self.expand2(dialogue)
+        else:
+            raise ValueError
+        return [None]
+
+    def expand1(self, dialogue) -> List[Any]:
+        return [None]
+
+    def expand2(self, dialogue) -> List[Any]:
         return [None]
 
     def get_dialogue_and_other(self, index):
@@ -107,6 +136,7 @@ class DSTDatasetForDST(DSTDataset):
         turns: list,
         latter: str,
         max_length: Optional[int] = None,
+        relative_turn_idx: int = -1,
         begin_str_idx: Optional[int] = None,
         end_str_idx: Optional[int] = None,
     ) -> dict:
@@ -117,7 +147,9 @@ class DSTDatasetForDST(DSTDataset):
         utterances = self.form_utterances(turns, max_length=max_length - latter_token_len - 3 - 10)
 
         if begin_str_idx is not None and end_str_idx is not None:
-            offset = sum(len(u) for u in utterances[:-1]) + len(utterances) - 1
+            offset = (
+                sum(len(u) + 1 for u in utterances[:relative_turn_idx])
+            )
             if self.user_token:
                 offset += len(self.user_token) + 1
 
@@ -151,6 +183,17 @@ class DSTDatasetForDST(DSTDataset):
 
         return ret
 
+    def form_turn(self, turn):
+        utterance = turn["utterance"]
+
+        special_token = self.user_token if turn["speaker"] == "USER" else self.system_token
+        if special_token is not None:
+            utterance = special_token + " " + utterance
+
+        utterance_tokens = self.tokenizer.tokenize(utterance)
+
+        return utterance, utterance_tokens
+
     def form_utterances(
         self,
         turns: List,
@@ -159,13 +202,7 @@ class DSTDatasetForDST(DSTDataset):
         cur_len, utterances = 0, []
 
         for turn in turns[::-1]:
-            utterance = turn["utterance"]
-
-            special_token = self.user_token if turn["speaker"] == "USER" else self.system_token
-            if special_token is not None:
-                utterance = special_token + " " + utterance
-
-            utterance_tokens = self.tokenizer.tokenize(utterance)
+            utterance, utterance_tokens = self.form_turn(turn)
 
             if cur_len + len(utterance_tokens) > max_length:
                 break
