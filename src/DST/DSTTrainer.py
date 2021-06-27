@@ -1,3 +1,4 @@
+from collections import defaultdict
 from pathlib import Path
 from typing import Callable, Dict, Optional, List
 
@@ -64,31 +65,37 @@ class DSTTrainer(Trainer):
     ) -> Dict[str, float]:
         eval_dataloader = self.get_eval_dataloader(eval_dataset=eval_dataset)
 
-        ret = {label_type: [0, 0] for label_type in self.label_names}
-        total_loss = 0
+        ret = defaultdict(list)
 
         with torch.no_grad():
             for inputs in tqdmm(eval_dataloader):
                 inputs = self._prepare_inputs(inputs)
                 outputs = self.model(**inputs)
-                total_loss += outputs["loss"].item()
-                for label_type in self.label_names:
-                    pred = outputs[f"{label_type.replace('_labels', '')}_logits"]
-                    if label_type in inputs:
-                        labels = inputs[label_type]
-                        if len(pred.shape) > 1:
-                            ret[label_type][0] += (
-                                (torch.argmax(pred, dim=-1) == labels).float().mean().item()
-                            )
-                        else:
-                            pred = torch.nn.Sigmoid()(pred)
-                            ret[label_type][0] += ((pred > 0.5) == labels).float().mean().item()
-                        ret[label_type][1] += 1
 
-            for key in list(ret.keys()):
-                ret[key] = ret[key][0] / ret[key][1]
-                ret[f"{metric_key_prefix}_" + key] = ret.pop(key)
-            ret.update({f"{metric_key_prefix}_loss": total_loss / len(eval_dataloader)})
+                for key in outputs:
+                    output = outputs[key]
+                    if "loss" in key:
+                        ret[key].append(output.item())
+                    elif "logits" in key:
+                        key = key.replace("logits", "labels")
+                        if key in inputs:
+                            labels = inputs[key]
+                            # begin/end acc
+                            if len(output.shape) > 1:
+                                ret[key].append(
+                                    (torch.argmax(output, dim=-1) == labels).float().mean().item()
+                                )
+                            # slot/value acc
+                            else:
+                                output = torch.nn.Sigmoid()(output)
+                                ret[key].append(((output > 0.5) == labels).float().mean().item())
+                    else:
+                        raise KeyError
+
+            ret = {
+                f"{metric_key_prefix}_{k}": torch.Tensor(v).mean().item()
+                for k, v in sorted(ret.items(), key=lambda x: x[0][::-1])
+            }
 
             self.log(ret)
             self.control = self.callback_handler.on_evaluate(
