@@ -82,8 +82,6 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
             # Always -1 to make it right-close
             cursor -= 1
 
-            assert cur_token_cnt <= 512 - 48
-
             if self.ensure_user_on_both_ends:
                 if cursor % 2 == 1:
                     cursor -= 1

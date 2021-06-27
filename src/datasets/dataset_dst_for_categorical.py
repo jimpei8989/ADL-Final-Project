@@ -47,10 +47,13 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
     def expand2(self, dialogue) -> List[Any]:
         ret = []
         turns = dialogue["turns"]
-        begin_turn_idx, cursor = 0, 0
+        begin_turn_idx = 0
 
         while True:
-            cur_token_cnt = 0
+            if self.ensure_user_on_both_ends and turns[begin_turn_idx]["speaker"] == "SYSTEM":
+                begin_turn_idx += 1
+
+            cursor, cur_token_cnt = begin_turn_idx, 0
             categorical_pairs = {}  # (service, slot) -> correct answer
 
             if begin_turn_idx >= 2:
@@ -96,7 +99,6 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
                 break
             else:
                 begin_turn_idx = cursor - self.overlap_turns
-                cursor = begin_turn_idx
 
         return ret
 
