@@ -78,6 +78,9 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
             if self.ensure_user_on_both_ends:
                 if cursor % 2 == 1:
                     cursor -= 1
+            else:
+                # minus one when the cursor reaches the en
+                cursor -= 1
 
             span_pairs = [
                 (*k, *v) for k, v in span_pairs.items() if v[0] <= cursor - begin_turn_idx

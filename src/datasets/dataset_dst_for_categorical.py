@@ -18,6 +18,9 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
 
         super().__init__(*args, **kwargs)
 
+    def extract_categorical_pairs(self, turn):
+        pass
+
     def expand1(self, dialogue) -> List[Any]:
         ret = []
 
@@ -73,6 +76,9 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
 
                     cursor += 1
                     cur_token_cnt += turn_token_len
+            else:
+                # minus one when the cursor reaches the en
+                cursor -= 1
 
             if self.ensure_user_on_both_ends:
                 if cursor % 2 == 1:
