@@ -72,9 +72,8 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
                 else:
                     cursor += 1
                     cur_token_cnt += turn_token_len
-            else:
-                # minus one when the cursor reaches the en
-                cursor -= 1
+            # Always -1 to make it right-close
+            cursor -= 1
 
             if self.ensure_user_on_both_ends:
                 if cursor % 2 == 1:

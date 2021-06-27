@@ -46,14 +46,19 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
     def expand2(self, dialogue):
         ret = []
         turns = dialogue["turns"]
-        begin_turn_idx, cursor = 0, 0
+        begin_turn_idx = 0
 
         while True:
+            if self.ensure_user_on_both_ends and turns[begin_turn_idx]["speaker"] == "SYSTEM":
+                begin_turn_idx += 1
+
+            cursor = begin_turn_idx
             cur_token_cnt = 0
             span_pairs = {}
 
             while cursor < len(turns):
                 turn = turns[cursor]
+
                 turn_token_len = len(self.form_turn(turn)[1])
 
                 if cur_token_cnt + turn_token_len > self.former_max_len:
@@ -74,13 +79,14 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
 
                     cursor += 1
                     cur_token_cnt += turn_token_len
+            # Always -1 to make it right-close
+            cursor -= 1
+
+            assert cur_token_cnt <= 512 - 48
 
             if self.ensure_user_on_both_ends:
                 if cursor % 2 == 1:
                     cursor -= 1
-            else:
-                # minus one when the cursor reaches the en
-                cursor -= 1
 
             span_pairs = [
                 (*k, *v) for k, v in span_pairs.items() if v[0] <= cursor - begin_turn_idx
@@ -92,7 +98,6 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
                 break
             else:
                 begin_turn_idx = cursor - self.overlap_turns
-                cursor = begin_turn_idx
 
         return ret
 
@@ -108,8 +113,6 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
 
         service = self.schema.service_by_name[service_name]
         slot = service.slot_by_name[slot_name]
-
-        # print(relative_turn_idx, start, end)
 
         ret = {"type": 2}
         ret.update(
@@ -132,6 +135,7 @@ if __name__ == "__main__":
     from pathlib import Path
     from transformers import AutoTokenizer
     from datasets.schema import Schema
+    from utils.tqdmm import tqdmm
 
     schema = Schema.load_json(Path("../dataset/data/schema.json"))
     tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
@@ -145,6 +149,18 @@ if __name__ == "__main__":
     )
 
     print(len(dataset))
-    print(dataset[0])
-    print(dataset[1])
-    print(dataset[2])
+
+    for d in tqdmm(dataset, desc="Asserting", leave=False):
+        assert not (d["begin_labels"] is None or d["end_labels"] is None)
+
+        input_ids = d["input_ids"]
+        utterance = d["utterance"]
+
+        begin_token = tokenizer.convert_ids_to_tokens(input_ids[d["begin_labels"]].item())
+        end_token = tokenizer.convert_ids_to_tokens(input_ids[d["end_labels"]].item())
+
+        # Do not use starts with and endswith, since the dataset has wrong labels
+        assert (
+            utterance[d["begin_str_idx"]].lower() in begin_token
+            and utterance[d["end_str_idx"] - 1].lower() in end_token
+        )
