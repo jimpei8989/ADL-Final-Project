@@ -50,7 +50,7 @@ def parse_args() -> Namespace:
     parser.add_argument("--system_token", help="use this after ensuring token is in vocab.txt")
     parser.add_argument("--strategy", choices=["turn", "segment"], default="segment")
     parser.add_argument("--last_user_turn_only", action="store_true")
-    parser.add_argument("--reserved_for_latter", type=int, default=48)
+    parser.add_argument("--reserved_for_latter", type=int, default=64)
     parser.add_argument("--overlap_turns", type=int, default=4)
     parser.add_argument("--no_ensure_user_on_both_ends", action="store_true")
 
