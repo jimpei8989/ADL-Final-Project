@@ -3,6 +3,8 @@ from pathlib import Path
 import torch
 import numpy as np
 import random
+from typing import Dict, Any
+import json
 
 from torch.utils.data import DataLoader
 
@@ -43,9 +45,16 @@ def parse_args() -> Namespace:
     # optimizer
     parser.add_argument("--weight_decay", type=float, default=1e-6)
 
-    # data loader
+    # dataset
     parser.add_argument("--user_token", help="use this after ensuring token is in vocab.txt")
     parser.add_argument("--system_token", help="use this after ensuring token is in vocab.txt")
+    parser.add_argument("--strategy", choices=["turn", "segment"], default="segment")
+    parser.add_argument("--last_user_turn_only", action="store_true")
+    parser.add_argument("--reserved_for_latter", type=int, default=48)
+    parser.add_argument("--overlap_turns", type=int, default=4)
+    parser.add_argument("--no_ensure_user_on_both_ends", action="store_true")
+
+    # data loader
     parser.add_argument("--batch_size", type=int, default=8)
     parser.add_argument("--num_workers", type=int, default=0)
     parser.add_argument("--seed", default=24296674, type=int)
@@ -100,8 +109,38 @@ def special_token_check(token: str, tokenizer: PreTrainedTokenizerBase):
     return True
 
 
+def get_dataset_kwargs(args: Namespace) -> Dict[str, Any]:
+    dataset_kwargs = {}
+    dataset_kwargs["user_token"] = args.user_token
+    dataset_kwargs["system_token"] = args.system_token
+    dataset_kwargs["strategy"] = args.strategy
+    dataset_kwargs["last_user_turn_only"] = args.last_user_turn_only
+    dataset_kwargs["reserved_for_latter"] = args.reserved_for_latter
+    dataset_kwargs["overlap_turns"] = args.overlap_turns
+    dataset_kwargs["ensure_user_on_both_ends"] = not args.no_ensure_user_on_both_ends
+
+    return dataset_kwargs
+
+
+def save_args(args) -> None:
+    class PathEncoder(json.JSONEncoder):
+        def default(self, obj):
+            if isinstance(obj, Path):
+                return str(obj)
+            return json.JSONEncoder.default(self, obj)
+
+    args.ckpt_dir.mkdir(parents=True)
+    json.dump(
+        vars(args),
+        (args.ckpt_dir / "arguments.json").open("w"),
+        indent=4,
+        cls=PathEncoder,
+    )
+
+
 def main(args):
     logger.info(args)
+    save_args(args)
     set_seed(args.seed)
 
     model = DSTModel(model_name=args.model_name_or_path)
@@ -130,14 +169,13 @@ def main(args):
 
     assert special_token_check(args.user_token, tokenizer)
     assert special_token_check(args.system_token, tokenizer)
-    dataset_kwargs = {}
-    dataset_kwargs["user_token"] = args.user_token
-    dataset_kwargs["system_token"] = args.system_token
     if args.user_token is not None:
         tokenizer.add_special_tokens({"additional_special_tokens": [args.user_token]})
     if args.system_token is not None:
         tokenizer.add_special_tokens({"additional_special_tokens": [args.system_token]})
 
+    dataset_kwargs = get_dataset_kwargs(args)
+    dataset_kwargs["max_seq_length"] = model.max_position_embeddings
     trainer = DSTTrainer(
         train_data_dir=args.train_data_dir,
         eval_data_dir=args.eval_data_dir,
@@ -146,9 +184,6 @@ def main(args):
         train_dataloader_cls=dataloader_cls.to_train_dataloader,
         eval_dataloader_cls=dataloader_cls.to_eval_dataloader,
         dataset_kwargs=dataset_kwargs,
-        for_slot_kwargs={"max_seq_length": model.max_position_embeddings},
-        for_categorical_kwargs={"max_seq_length": model.max_position_embeddings},
-        for_span_kwargs={"max_seq_length": model.max_position_embeddings},
         model=model,
         args=train_args,
         compute_metrics=compute_metrics,
