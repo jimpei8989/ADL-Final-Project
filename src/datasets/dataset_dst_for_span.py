@@ -109,7 +109,7 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
         service = self.schema.service_by_name[service_name]
         slot = service.slot_by_name[slot_name]
 
-        print(relative_turn_idx, start, end)
+        # print(relative_turn_idx, start, end)
 
         ret = {"type": 2}
         ret.update(
