@@ -183,7 +183,15 @@ def main(args):
     # Dump to output file
     dids, final = zip(*final_states.items())
     final = list(
-        map(lambda s: "None" if len(s) == 0 else "|".join(f"{a}={b}" for a, b in s.items()), final)
+        map(
+            lambda s: "None"
+            if len(s) == 0
+            else "|".join(
+                f"{a.lower()}={b.replace(',', '_').lower()}"
+                for a, b in sorted(s.items(), key=lambda x: x[0])
+            ),
+            final,
+        )
     )
     pd.DataFrame({"id": dids, "state": final}).to_csv(args.prediction_csv, index=False)
 
