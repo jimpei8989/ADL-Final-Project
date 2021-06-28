@@ -68,7 +68,9 @@ def main(args):
     slot_dataloader = to_dataloader(slot_dataset)
 
     model = DSTModel.from_pretrained(
-        args.pretrained_path, model_name=args.model_name_or_path, device=args.device
+        args.pretrained_dir / "pytorch_model.bin",
+        model_name=args.model_name_or_path,
+        device=args.device,
     )
     model.to(args.device)
     model.eval()
@@ -85,7 +87,7 @@ def main(args):
                 output = batch_output.logits_by_index(i)
 
                 if output.slot_logits > 0:
-                    if schema.service_by_name[key[2]].slot_by_name[key[3]].is_categorical:
+                    if schema.service_by_name[key[3]].slot_by_name[key[4]].is_categorical:
                         dialogue_to_others[key[0]].append(key[1:])
                     else:
                         begin_scores = output.begin_logits.softmax(dim=0)
@@ -137,7 +139,7 @@ def main(args):
                                 STRIP_CHARS
                             )
 
-                            states[key[0]][key[1]][f"{key[2]}-{key[3]}"] = value
+                            states[key[0]][key[2]][f"{key[3]}-{key[4]}"] = value
 
     if args.test_mode:
         print(dialogue_to_others)
@@ -163,14 +165,14 @@ def main(args):
             for i in range(batch["input_ids"].shape[0]):
                 key, answer = batch["_key"][i], batch["answer"][i]
                 value_logits = batch_output.logits_by_index(i).value_logits
-                categorical_outputs[key[:4]].append((answer, value_logits.item()))
+                categorical_outputs[key].append((answer, value_logits.item()))
 
     if args.test_mode:
         print(categorical_outputs)
 
     # Finalize categorical outputs
     for key, answers in categorical_outputs.items():
-        states[key[0]][key[1]][f"{key[2]}-{key[3]}"] = max(answers, key=lambda p: p[1])[0]
+        states[key[0]][key[2]][f"{key[3]}-{key[4]}"] = max(answers, key=lambda p: p[1])[0]
 
     # Finalize states
     final_states = defaultdict(dict)
@@ -195,7 +197,7 @@ def parse_args():
 
     # Model
     parser.add_argument("--model_name_or_path", default="bert-base-uncased")
-    parser.add_argument("--pretrained_path", required=True, type=Path)
+    parser.add_argument("--pretrained_dir", required=True, type=Path)
 
     # Dataset
     parser.add_argument("--test_data_dir", type=Path, default="dataset/data/test_seen")

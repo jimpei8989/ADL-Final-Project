@@ -19,11 +19,13 @@ class DSTDatasetForDSTForCategoricalPrediction(DSTDatasetForDST):
             return []
 
         ret = []
-        for turn_idx, service_name, slot_name in self.dialogue_to_others[dialogue["dialogue_id"]]:
+        for begin_turn_idx, end_turn_idx, service_name, slot_name in self.dialogue_to_others[
+            dialogue["dialogue_id"]
+        ]:
             slot = self.schema.service_by_name[service_name].slot_by_name[slot_name]
 
             for answer in slot.possible_values:
-                ret.append((turn_idx, service_name, slot_name, answer))
+                ret.append((begin_turn_idx, end_turn_idx, service_name, slot_name, answer))
 
         return ret
 
@@ -31,14 +33,14 @@ class DSTDatasetForDSTForCategoricalPrediction(DSTDatasetForDST):
         return True
 
     def form_data(self, dialogue, other) -> dict:
-        turn_idx, service_name, slot_name, answer = other
+        begin_turn_idx, end_turn_idx, service_name, slot_name, answer = other
 
         service = self.schema.service_by_name[service_name]
         slot = service.slot_by_name[slot_name]
 
         ret = self._form_data(
             dialogue=dialogue,
-            turns=dialogue["turns"][: turn_idx + 1],
+            turns=dialogue["turns"][begin_turn_idx: end_turn_idx + 1],
             latter=f" {self.tokenizer.sep_token} ".join(
                 [service.description, slot.description, answer]
             ),
