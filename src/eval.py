@@ -39,7 +39,12 @@ def eval(args):
 
     if args.save_for_view:
         os.makedirs("forview/", exist_ok=True)
-        json.dump(labels, Path("forview/dev_gt_forview.json").open("w"), indent=2)
+        json.dump(
+            labels,
+            Path("forview/dev_gt_forview.json").open("w"),
+            indent=2,
+            sort_keys=True,
+        )
 
     df = pd.read_csv(args.pred_file)
     preds = {}
@@ -56,7 +61,12 @@ def eval(args):
             preds[row["id"]] = {}
 
     if args.save_for_view:
-        json.dump(preds, Path("forview/dev_pred_forview.json").open("w"), indent=2)
+        json.dump(
+            preds,
+            Path("forview/dev_pred_forview.json").open("w"),
+            indent=2,
+            sort_keys=True,
+        )
     # print(len(labels), len(preds))
     # assert len(labels) == len(preds)
 
