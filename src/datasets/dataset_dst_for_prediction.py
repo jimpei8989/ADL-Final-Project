@@ -56,10 +56,11 @@ class DSTDatasetForDSTForPrediction(DSTDatasetForDST):
             if cursor >= len(dialogue["turns"]) - 2:
                 break
             else:
-                begin_turn_idx = cursor - self.overlap_turns
                 for service_name in dialogue["services"]:
                     for slot in self.schema.service_by_name[service_name].slots:
                         ret.append((begin_turn_idx, cursor, service_name, slot.name))
+
+                begin_turn_idx = cursor - self.overlap_turns
         return ret
 
     def check_data(self, dialogue, other):

@@ -24,10 +24,8 @@ STRIP_CHARS = ",.:;!?\"'@#$%^&*()| \t\n"
 
 def load_args(args_path: Path) -> Namespace:
     if args_path is not None:
-        train_args = Namespace()
-        train_args.__dict__.update(json_load(args_path))
+        train_args = Namespace(**json_load(args_path))
         train_args = ArgumentParser().parse_args(namespace=train_args)
-
         return train_args
     return None
 
