@@ -143,13 +143,14 @@ class DSTDatasetForDST(DSTDataset):
         # [CLS] utterance [SEP] latter [SEP]
         latter_token_len = len(self.tokenizer.tokenize(latter))
 
-        # The extra -10 are for buffer
-        utterances = self.form_utterances(turns, max_length=max_length - latter_token_len - 3 - 10)
+        # ???
+        # if self.stategy == "turn":
+        #     max_length -= 10
+
+        utterances = self.form_utterances(turns, max_length=max_length - latter_token_len - 3)
 
         if begin_str_idx is not None and end_str_idx is not None:
-            offset = (
-                sum(len(u) + 1 for u in utterances[:relative_turn_idx])
-            )
+            offset = sum(len(u) + 1 for u in utterances[:relative_turn_idx])
             if self.user_token:
                 offset += len(self.user_token) + 1
 
