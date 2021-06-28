@@ -26,8 +26,9 @@ class Viewer:
 
         if turn["speaker"] == "USER":
             print("  FRAMES:\t")
-            for frame in turn["frames"]:
-                self.print_frame(frame)
+            if "frames" in turn:
+                for frame in turn["frames"]:
+                    self.print_frame(frame)
 
     def print(self, dialogue):
         print(

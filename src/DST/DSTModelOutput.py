@@ -18,8 +18,8 @@ class DSTModelOutput(ModelOutput):
     # Useful in prediction
     def logits_by_index(self, index):
         return DSTModelOutput(
-            slot_logits=self.slot_logits[index],
-            value_logits=self.value_logits[index],
-            begin_logits=self.begin_logits[index],
-            end_logits=self.end_logits[index],
+            slot_logits=self.slot_logits[index].cpu(),
+            value_logits=self.value_logits[index].cpu(),
+            begin_logits=self.begin_logits[index].cpu(),
+            end_logits=self.end_logits[index].cpu(),
         )

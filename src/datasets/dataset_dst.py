@@ -73,7 +73,7 @@ class DSTDatasetForDST(DSTDataset):
         return self.form_data(*self.get_dialogue_and_other(index))
 
     def __len__(self):
-        return len(self.valid_indices) if not self.test_mode else 10
+        return len(self.valid_indices) if not self.test_mode else min(len(self.valid_indices), 64)
 
     # About the expanding
     def before_expand(self) -> None:
@@ -170,6 +170,7 @@ class DSTDatasetForDST(DSTDataset):
             "utterance": utterance,
             "latter": latter,
             "input_ids": encoded.input_ids.squeeze(0),
+            "_encoded": encoded,
         }
 
         if begin_str_idx is not None and end_str_idx is not None:

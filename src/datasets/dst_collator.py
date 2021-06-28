@@ -13,7 +13,10 @@ class DSTCollator:
     def __call__(self, batches: List[Dict[str, Any]]) -> Dict[str, Any]:
         first = batches[0]
 
-        ret = {"type": first["type"]}
+        ret = {}
+        if "type" in first:
+            ret.update({"type": first["type"]})
+
         for key in filter(lambda k: k not in self.ignored, first.keys()):
             if key == "input_ids":
                 ret.update(
@@ -25,6 +28,8 @@ class DSTCollator:
                         )
                     }
                 )
+            elif key.startswith("_"):
+                ret.update({key: [b[key] for b in batches]})
             else:
                 ret.update({key: default_collate([b[key] for b in batches])})
         return ret
