@@ -34,7 +34,7 @@ def eval(args):
                 for k, v in frame["state"]["slot_values"].items():
                     state[f"{frame['service']}-{k}"] = v[0]
             labels[dialogue["dialogue_id"]] = dict(state)
-    json.dump(labels, Path("dev_gt_forview.json").open("w"), indent=2)
+    # json.dump(labels, Path("dev_gt_forview.json").open("w"), indent=2)
 
     df = pd.read_csv(args.pred_file)
     preds = {}
