@@ -30,12 +30,9 @@ def eval(args):
     for data_path in args.data_dir.iterdir():
         for dialogue in json.loads(data_path.read_bytes()):
             state = defaultdict(str)
-            for t in dialogue["turns"]:
-                if t["speaker"] == "SYSTEM":
-                    continue
-                for frame in t["frames"][-2:-1]:
-                    for k, v in frame["state"]["slot_values"].items():
-                        state[f"{frame['service']}-{k}"] = v[0]
+            for frame in dialogue["turns"][-2]:
+                for k, v in frame["state"]["slot_values"].items():
+                    state[f"{frame['service']}-{k}"] = v[0]
             labels[dialogue["dialogue_id"]] = dict(state)
     check_OR(labels)
 
