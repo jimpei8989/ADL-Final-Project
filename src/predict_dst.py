@@ -1,4 +1,4 @@
-from argparse import ArgumentParser
+from argparse import ArgumentParser, Namespace
 from collections import defaultdict
 from pathlib import Path
 
@@ -6,8 +6,7 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from transformers import AutoTokenizer, PreTrainedTokenizerBase
-from transformers.trainer_utils import set_seed
+from transformers import AutoTokenizer
 
 from datasets.dataset_dst_for_categorical_prediction import (
     DSTDatasetForDSTForCategoricalPrediction,
@@ -16,45 +15,50 @@ from datasets.dataset_dst_for_prediction import DSTDatasetForDSTForPrediction
 from datasets.dst_collator import DSTCollator
 from datasets.schema import Schema
 from DST.DSTModel import DSTModel
+from utils.utils import set_seed, get_dataset_kwargs, add_tokens
 
 STRIP_CHARS = ",.:;!?\"'@#$%^&*()| \t\n"
 
 
-def special_token_check(token: str, tokenizer: PreTrainedTokenizerBase):
-    if token is not None:
-        ids = tokenizer.convert_tokens_to_ids([token])
-        if len(ids) == 1 and ids[0] != tokenizer.unk_token_id:
-            return True
-        return False
-    return True
+def load_args(args_path: Path) -> Namespace:
+    if args_path is not None:
+        train_args = Namespace()
+        train_args.__dict__.update(json.load(args_path.open("r")))
+        train_args = ArgumentParser().parse_args(namespace=train_args)
+
+        return train_args
+    return None
 
 
 def main(args):
     set_seed(args.seed)
+    train_args = load_args(args.train_args_path)
 
     schema = Schema.load_json(args.schema_json)
-
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+    model = DSTModel.from_pretrained(
+        args.pretrained_dir / "pytorch_model.bin",
+        model_name=args.model_name_or_path,
+        device=args.device,
+    )
+    model.to(args.device)
+    model.eval()
 
-    assert special_token_check(args.user_token, tokenizer)
-    assert special_token_check(args.system_token, tokenizer)
-
-    dataset_kwargs = {}
-    dataset_kwargs["user_token"] = args.user_token
-    dataset_kwargs["system_token"] = args.system_token
-    if args.user_token is not None:
-        tokenizer.add_special_tokens({"additional_special_tokens": [args.user_token]})
-    if args.system_token is not None:
-        tokenizer.add_special_tokens({"additional_special_tokens": [args.system_token]})
+    dataset_kwargs = get_dataset_kwargs(
+        train_args if train_args is not None else args, max_length=model.max_position_embeddings
+    )
+    tokenizer = add_tokens(
+        tokenizer,
+        train_args.user_token if train_args is not None else args.user_token,
+        train_args.system_token if train_args is not None else args.system_token,
+    )
 
     slot_dataset = DSTDatasetForDSTForPrediction(
         json_dir=args.test_data_dir,
         schema=schema,
         tokenizer=tokenizer,
-        max_seq_length=512,  # TODO: extract from tokenizer
-        user_token=args.user_token,
-        system_token=args.system_token,
         test_mode=args.test_mode,
+        **dataset_kwargs,
     )
 
     def to_dataloader(dataset):
@@ -66,14 +70,6 @@ def main(args):
         )
 
     slot_dataloader = to_dataloader(slot_dataset)
-
-    model = DSTModel.from_pretrained(
-        args.pretrained_dir / "pytorch_model.bin",
-        model_name=args.model_name_or_path,
-        device=args.device,
-    )
-    model.to(args.device)
-    model.eval()
 
     states = defaultdict(lambda: defaultdict(dict))  # (dialogue_id, turn_idx) -> slot : value
     dialogue_to_others = defaultdict(list)
@@ -149,10 +145,8 @@ def main(args):
         json_dir=args.test_data_dir,
         schema=schema,
         tokenizer=tokenizer,
-        max_seq_length=512,  # TODO: extract from tokenizer
-        user_token=args.user_token,
-        system_token=args.system_token,
         test_mode=args.test_mode,
+        **dataset_kwargs,
     )
     categorical_dataloader = to_dataloader(categorical_dataset)
 
@@ -198,6 +192,7 @@ def parse_args():
     # Model
     parser.add_argument("--model_name_or_path", default="bert-base-uncased")
     parser.add_argument("--pretrained_dir", required=True, type=Path)
+    parser.add_argument("--train_args_path", type=Path)
 
     # Dataset
     parser.add_argument("--test_data_dir", type=Path, default="dataset/data/test_seen")
@@ -206,6 +201,11 @@ def parse_args():
     parser.add_argument("--num_workers", type=int, default=0)
     parser.add_argument("--user_token", help="use this after ensuring token is in vocab.txt")
     parser.add_argument("--system_token", help="use this after ensuring token is in vocab.txt")
+    parser.add_argument("--strategy", choices=["turn", "segment"], default="segment")
+    parser.add_argument("--last_user_turn_only", action="store_true")
+    parser.add_argument("--reserved_for_latter", type=int, default=48)
+    parser.add_argument("--overlap_turns", type=int, default=4)
+    parser.add_argument("--no_ensure_user_on_both_ends", action="store_true")
 
     # Prediction
     parser.add_argument("--prediction_csv", type=Path, default="prediction.csv")
