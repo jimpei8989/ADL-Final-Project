@@ -92,7 +92,12 @@ if __name__ == "__main__":
         schema_json=Path("../dataset/data/schema.json"),
         tokenizer=tokenizer,
         dataloader_cls=to_dataloader,
-        dataset_kwargs={"system_token": tokenizer.sep_token, "user_token": tokenizer.sep_token},
+        # TODO: @chiachia will fix this hard-coded garbage
+        dataset_kwargs={
+            "system_token": tokenizer.sep_token,
+            "user_token": tokenizer.sep_token,
+            "strategy": "segment",
+        },
     )
 
     for i, batch in enumerate(tqdmm(dataloader, desc="Iterating through the dataloader")):
