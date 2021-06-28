@@ -7,11 +7,8 @@ class DSTDatasetForDSTForPrediction(DSTDatasetForDST):
     def __init__(
         self,
         *args,
-        last_user_turn_only: bool = False,
         **kwargs,
     ):
-        self.last_user_turn_only = last_user_turn_only
-
         super().__init__(*args, **kwargs)
 
     def expand1(self, dialogue) -> List[Any]:
