@@ -9,7 +9,7 @@ def get_args() -> Namespace:
     parser = ArgumentParser()
 
     parser.add_argument("--data_dir", "-g", type=Path, required=True)
-    parser.add_argument("--pred_file", "-p", type=Path, required=True)
+    parser.add_argument("--pred_file", "-p", type=Path)
     parser.add_argument("--first_only", action="store_true")
 
     args = parser.parse_args()
@@ -30,11 +30,11 @@ def eval(args):
     for data_path in args.data_dir.iterdir():
         for dialogue in json.loads(data_path.read_bytes()):
             state = defaultdict(str)
-            for frame in dialogue["turns"][-2]:
+            for frame in dialogue["turns"][-2]["frames"]:
                 for k, v in frame["state"]["slot_values"].items():
                     state[f"{frame['service']}-{k}"] = v[0]
             labels[dialogue["dialogue_id"]] = dict(state)
-    check_OR(labels)
+    json.dump(labels, Path("dev_gt_forview.json").open("w"), indent=2)
 
     df = pd.read_csv(args.pred_file)
     preds = {}
