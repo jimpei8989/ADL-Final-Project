@@ -3,6 +3,7 @@ from pathlib import Path
 import json
 from collections import defaultdict
 import pandas as pd
+import os
 
 
 def get_args() -> Namespace:
@@ -11,6 +12,7 @@ def get_args() -> Namespace:
     parser.add_argument("--data_dir", "-g", type=Path, required=True)
     parser.add_argument("--pred_file", "-p", type=Path)
     parser.add_argument("--first_only", action="store_true")
+    parser.add_argument("--save_for_view", action="store_true")
 
     args = parser.parse_args()
 
@@ -34,7 +36,10 @@ def eval(args):
                 for k, v in frame["state"]["slot_values"].items():
                     state[f"{frame['service']}-{k}"] = v[0]
             labels[dialogue["dialogue_id"]] = dict(state)
-    # json.dump(labels, Path("dev_gt_forview.json").open("w"), indent=2)
+
+    if args.save_for_view:
+        os.makedirs("forview/", exist_ok=True)
+        json.dump(labels, Path("forview/dev_gt_forview.json").open("w"), indent=2)
 
     df = pd.read_csv(args.pred_file)
     preds = {}
@@ -50,7 +55,11 @@ def eval(args):
         else:
             preds[row["id"]] = {}
 
-    assert len(labels) == len(preds)
+    if args.save_for_view:
+        json.dump(labels, Path("forview/dev_pred_forview.json").open("w"), indent=2)
+    # print(len(labels), len(preds))
+    # assert len(labels) == len(preds)
+
     correct = 0
     for dialogue_id in labels:
         if (
