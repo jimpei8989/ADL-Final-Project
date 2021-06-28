@@ -56,7 +56,7 @@ def eval(args):
             preds[row["id"]] = {}
 
     if args.save_for_view:
-        json.dump(labels, Path("forview/dev_pred_forview.json").open("w"), indent=2)
+        json.dump(preds, Path("forview/dev_pred_forview.json").open("w"), indent=2)
     # print(len(labels), len(preds))
     # assert len(labels) == len(preds)
 
