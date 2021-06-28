@@ -1,3 +1,4 @@
+import os
 from argparse import ArgumentParser, Namespace
 from collections import defaultdict
 from pathlib import Path
@@ -15,6 +16,7 @@ from datasets.dataset_dst_for_prediction import DSTDatasetForDSTForPrediction
 from datasets.dst_collator import DSTCollator
 from datasets.schema import Schema
 from DST.DSTModel import DSTModel
+from utils.io import json_load
 from utils.utils import set_seed, get_dataset_kwargs, add_tokens
 
 STRIP_CHARS = ",.:;!?\"'@#$%^&*()| \t\n"
@@ -23,7 +25,7 @@ STRIP_CHARS = ",.:;!?\"'@#$%^&*()| \t\n"
 def load_args(args_path: Path) -> Namespace:
     if args_path is not None:
         train_args = Namespace()
-        train_args.__dict__.update(json.load(args_path.open("r")))
+        train_args.__dict__.update(json_load(args_path))
         train_args = ArgumentParser().parse_args(namespace=train_args)
 
         return train_args
@@ -31,6 +33,9 @@ def load_args(args_path: Path) -> Namespace:
 
 
 def main(args):
+    # Add this line to avoid tokenizer raising warnings
+    os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
     set_seed(args.seed)
     train_args = load_args(args.train_args_path)
 
@@ -159,7 +164,7 @@ def main(args):
             for i in range(batch["input_ids"].shape[0]):
                 key, answer = batch["_key"][i], batch["answer"][i]
                 value_logits = batch_output.logits_by_index(i).value_logits
-                categorical_outputs[key].append((answer, value_logits.item()))
+                categorical_outputs[key[:5]].append((answer, value_logits.item()))
 
     if args.test_mode:
         print(categorical_outputs)
