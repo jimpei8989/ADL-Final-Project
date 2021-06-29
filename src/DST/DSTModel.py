@@ -20,7 +20,7 @@ class DSTModel(torch.nn.Module):
         device=torch.device("cpu"),
     ):
         model = cls(model_name=model_name, pool=pool)
-        model.load_state_dict(torch.load(pretrained_path, map_location=device))
+        model.load_state_dict(torch.load(pretrained_path, map_location=device), strict=False)
         return model
 
     def __init__(
