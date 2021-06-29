@@ -1,6 +1,7 @@
 from typing import Any, List
 
 from datasets.dataset_dst import DSTDatasetForDST
+from utils.logger import logger
 
 
 class DSTDatasetForDSTForPrediction(DSTDatasetForDST):
@@ -10,6 +11,26 @@ class DSTDatasetForDSTForPrediction(DSTDatasetForDST):
         **kwargs,
     ):
         super().__init__(*args, **kwargs)
+
+    def before_expand(self) -> None:
+        self.segments_per_dialogue = []
+
+    def after_expand(self) -> None:
+        if self.strategy == "segment":
+            logger.info(
+                "\n".join(
+                    [
+                        "Some statistics about the segment length:",
+                        f"Total: {sum(self.segments_per_dialogue)} / "
+                        f"{len(self.segments_per_dialogue)}",
+                        f"Avg: {sum(self.segments_per_dialogue) / len(self.segments_per_dialogue)}",
+                        f"Max: {max(self.segments_per_dialogue)}",
+                        f"Min: {min(self.segments_per_dialogue)}",
+                        f"Len = 1: {sum(i == 1 for i in self.segments_per_dialogue)}",
+                        f"Len = 2: {sum(i == 2 for i in self.segments_per_dialogue)}",
+                    ]
+                )
+            )
 
     def expand1(self, dialogue) -> List[Any]:
         ret = []
@@ -30,7 +51,7 @@ class DSTDatasetForDSTForPrediction(DSTDatasetForDST):
     def expand2(self, dialogue) -> List[Any]:
         ret = []
         turns = dialogue["turns"]
-        begin_turn_idx = 0
+        cnt, begin_turn_idx = 0, 0
 
         while True:
             if self.ensure_user_on_both_ends and turns[begin_turn_idx]["speaker"] == "SYSTEM":
@@ -57,10 +78,13 @@ class DSTDatasetForDSTForPrediction(DSTDatasetForDST):
                 for slot in self.schema.service_by_name[service_name].slots:
                     ret.append((begin_turn_idx, cursor, service_name, slot.name))
 
+            cnt += 1
             if cursor >= len(dialogue["turns"]) - 2:
                 break
             else:
                 begin_turn_idx = cursor - self.overlap_turns
+
+        self.segments_per_dialogue.append(cnt)
         return ret
 
     def check_data(self, dialogue, other):

@@ -1,3 +1,4 @@
+from collections import Counter
 from typing import Any, List
 
 
@@ -46,6 +47,7 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
     def expand2(self, dialogue):
         ret = []
         turns = dialogue["turns"]
+        services = set(dialogue["services"])
         begin_turn_idx = 0
 
         while True:
@@ -65,7 +67,7 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
                     break
                 else:
                     if turn["speaker"] == "USER":
-                        for frame in turn["frames"]:
+                        for frame in filter(lambda f: f["service"] in services, turn["frames"]):
                             service = frame["service"]
 
                             for s in filter(
@@ -148,17 +150,42 @@ if __name__ == "__main__":
 
     print(len(dataset))
 
-    for d in tqdmm(dataset, desc="Asserting", leave=False):
-        assert not (d["begin_labels"] is None or d["end_labels"] is None)
+    if True:
+        span_lengths = []
+        for i in tqdmm(dataset.valid_indices, desc="Calculating span lengths"):
+            dialogue, other = dataset.get_dialogue_and_other(i)
+            begin_turn_idx, end_turn_idx, span_pairs = other
 
-        input_ids = d["input_ids"]
-        utterance = d["utterance"]
+            for service_name, slot_name, relative_turn_idx, start, end in span_pairs:
+                service = dataset.schema.service_by_name[service_name]
+                slot = service.slot_by_name[slot_name]
 
-        begin_token = tokenizer.convert_ids_to_tokens(input_ids[d["begin_labels"]].item())
-        end_token = tokenizer.convert_ids_to_tokens(input_ids[d["end_labels"]].item())
+                ret = dataset._form_data(
+                    dialogue=dialogue,
+                    turns=dialogue["turns"][begin_turn_idx : end_turn_idx + 1],
+                    latter=f" {dataset.tokenizer.sep_token} ".join(
+                        [service.description, slot.description]
+                    ),
+                    max_length=dataset.max_seq_length,
+                    relative_turn_idx=relative_turn_idx,
+                    begin_str_idx=start,
+                    end_str_idx=end,
+                )
+                span_lengths.append(ret["end_labels"] - ret["begin_labels"] + 1)
+        print(Counter(span_lengths))
 
-        # Do not use starts with and endswith, since the dataset has wrong labels
-        assert (
-            utterance[d["begin_str_idx"]].lower() in begin_token
-            and utterance[d["end_str_idx"] - 1].lower() in end_token
-        )
+    if False:
+        for d in tqdmm(dataset, desc="Asserting & Analyzing", leave=False):
+            assert not (d["begin_labels"] is None or d["end_labels"] is None)
+
+            input_ids = d["input_ids"]
+            utterance = d["utterance"]
+
+            begin_token = tokenizer.convert_ids_to_tokens(input_ids[d["begin_labels"]].item())
+            end_token = tokenizer.convert_ids_to_tokens(input_ids[d["end_labels"]].item())
+
+            # Do not use starts with and endswith, since the dataset has wrong labels
+            assert (
+                utterance[d["begin_str_idx"]].lower() in begin_token
+                and utterance[d["end_str_idx"] - 1].lower() in end_token
+            )

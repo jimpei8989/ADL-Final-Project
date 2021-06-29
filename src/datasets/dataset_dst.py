@@ -57,6 +57,8 @@ class DSTDatasetForDST(DSTDataset):
             self.expanded[did] = self.expand(dialogue)
             self.prefix_sum.append(self.prefix_sum[-1] + len(self.expanded[did]))
 
+        self.after_expand()
+
         logger.info(
             f"Finished preprocessing dialogues, there're {self.prefix_sum[-1]} samples in total..."
         )
@@ -77,6 +79,9 @@ class DSTDatasetForDST(DSTDataset):
 
     # About the expanding
     def before_expand(self) -> None:
+        pass
+
+    def after_expand(self) -> None:
         pass
 
     def expand(self, dialogue) -> List[Any]:
