@@ -58,9 +58,11 @@ class DSTModel(torch.nn.Module):
     ) -> Dict[str, torch.Tensor]:
         last_hidden_states = self.backbone(input_ids)["last_hidden_state"]
 
-        cls_logits = self.cls_fc(last_hidden_states[:, 0])
-        if self.pool:
-            cls_logits = self.pooler(cls_logits)
+        cls_logits = (
+            self.cls_fc(self.pooler(last_hidden_states[:, 0]))
+            if self.pool
+            else self.cls_fc(last_hidden_states[:, 0])
+        )
         slot_logits = cls_logits[:, 0]
         value_logits = cls_logits[:, 1]
 
