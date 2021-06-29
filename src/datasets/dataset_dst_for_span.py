@@ -59,7 +59,6 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
 
             cursor = begin_turn_idx
             cur_token_cnt = 0
-            span_pairs = {}
 
             while cursor < len(turns):
                 turn = turns[cursor]
@@ -69,19 +68,6 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
                 if cur_token_cnt + turn_token_len > self.former_max_len:
                     break
                 else:
-                    if turn["speaker"] == "USER":
-                        for frame in turn["frames"]:
-                            service = frame["service"]
-
-                            for s in filter(
-                                lambda s: "start" in s and "exclusive_end" in s, frame["slots"]
-                            ):
-                                span_pairs[(service, s["slot"])] = (
-                                    cursor - begin_turn_idx,
-                                    s["start"],
-                                    s["exclusive_end"],
-                                )
-
                     cursor += 1
                     cur_token_cnt += turn_token_len
             # Always -1 to make it right-close
@@ -91,9 +77,22 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
                 if cursor % 2 == 1:
                     cursor -= 1
 
-            span_pairs = [
-                (*k, *v) for k, v in span_pairs.items() if v[0] <= cursor - begin_turn_idx
-            ]
+            span_pairs = {}
+            for turn_idx in range(begin_turn_idx, cursor + 1):
+                turn = turns[turn_idx]
+                for frame in turn["frames"]:
+                    service = frame["service"]
+
+                    for s in filter(
+                        lambda s: "start" in s and "exclusive_end" in s, frame["slots"]
+                    ):
+                        span_pairs[(service, s["slot"])] = (
+                            turn_idx - begin_turn_idx,
+                            s["start"],
+                            s["exclusive_end"],
+                        )
+
+            span_pairs = [(*k, *v) for k, v in span_pairs.items()]
 
             if self.expand_span:
                 ret.extend((begin_turn_idx, cursor, s) for s in span_pairs)
