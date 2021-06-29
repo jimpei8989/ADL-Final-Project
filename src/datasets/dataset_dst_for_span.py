@@ -50,7 +50,7 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
 
     def expand2(self, dialogue):
         ret = []
-        turns = dialogue["turns"]
+        turns, services = dialogue["turns"], set(dialogue["services"])
         begin_turn_idx = 0
 
         while True:
@@ -83,6 +83,9 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
                 for frame in turn["frames"]:
                     service = frame["service"]
 
+                    if service not in services:
+                        continue
+
                     for s in filter(
                         lambda s: "start" in s and "exclusive_end" in s, frame["slots"]
                     ):
@@ -92,7 +95,16 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
                             s["exclusive_end"],
                         )
 
-            span_pairs = [(*k, *v) for k, v in span_pairs.items()]
+            last_user_turn = (
+                turns[cursor] if turns[cursor]["speaker"] == "USER" else turns[cursor - 1]
+            )
+            last_user_turn_states = set(
+                (frame["service"], slot)
+                for frame in last_user_turn["frames"]
+                for slot in frame["state"]["slot_values"]
+            )
+
+            span_pairs = [(*k, *v) for k, v in span_pairs.items() if k in last_user_turn_states]
 
             if self.expand_span:
                 ret.extend((begin_turn_idx, cursor, s) for s in span_pairs)
