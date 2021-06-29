@@ -25,7 +25,7 @@ class DSTTrainer(Trainer):
         for_slot_kwargs: Optional[Dict] = None,
         for_categorical_kwargs: Optional[Dict] = None,
         for_span_kwargs: Optional[Dict] = None,
-        dataset_type: str = None,
+        dataset_type: List = None,
         **kwargs,
     ):
         self.train_dataloader = load_dst_dataloader(
