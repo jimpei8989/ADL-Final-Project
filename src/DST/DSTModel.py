@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Dict
 
 import torch
-from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss
+from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, Sequential, Linear, Tanh
 
 from transformers import AutoModel, AutoConfig
 
@@ -26,6 +26,7 @@ class DSTModel(torch.nn.Module):
         self,
         model_name: str = None,
         config: str = None,
+        pool: bool = False,
     ) -> None:
         super(DSTModel, self).__init__()
         if model_name is not None:
@@ -35,9 +36,13 @@ class DSTModel(torch.nn.Module):
                 pickle.load(open(config, "rb")) if config is not None else AutoConfig()
             )
 
+        self.pool = pool
+        self.hidden_size = self.backbone.config.hidden_size
         self.max_position_embeddings = self.backbone.config.max_position_embeddings
-        self.cls_fc = torch.nn.Linear(self.backbone.config.hidden_size, 2)
-        self.span_fc = torch.nn.Linear(self.backbone.config.hidden_size, 2)
+
+        self.cls_fc = Linear(self.hidden_size, 2)
+        self.span_fc = Linear(self.hidden_size, 2)
+        self.pooler = Sequential(Linear(self.hidden_size, self.hidden_size), Tanh())
 
         self.cls_criterion = BCEWithLogitsLoss()
         self.span_criterion = CrossEntropyLoss()
@@ -54,6 +59,8 @@ class DSTModel(torch.nn.Module):
         last_hidden_states = self.backbone(input_ids)["last_hidden_state"]
 
         cls_logits = self.cls_fc(last_hidden_states[:, 0])
+        if self.pool:
+            cls_logits = self.pooler(cls_logits)
         slot_logits = cls_logits[:, 0]
         value_logits = cls_logits[:, 1]
 
