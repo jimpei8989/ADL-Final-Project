@@ -86,7 +86,6 @@ class DSTDatasetForDST(DSTDataset):
             return self.expand2(dialogue)
         else:
             raise ValueError
-        return [None]
 
     def expand1(self, dialogue) -> List[Any]:
         return [None]

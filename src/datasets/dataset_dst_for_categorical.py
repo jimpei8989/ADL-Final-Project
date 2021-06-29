@@ -12,9 +12,11 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
         self,
         *args,
         negative_ratio=1.0,
+        expand_categorical=False,
         **kwargs,
     ):
         self.negative_ratio = negative_ratio
+        self.expand_categorical = expand_categorical
 
         super().__init__(*args, **kwargs)
 
@@ -40,7 +42,11 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
             assert turn["speaker"] == "USER"
 
             categorical_pairs = [(*k, v) for k, v in self.extract_categorical_pairs(turn).items()]
-            ret.append((0, turn_idx, categorical_pairs))
+
+            if self.expand_categorical:
+                ret.extend((0, turn_idx, c) for c in categorical_pairs)
+            else:
+                ret.append((0, turn_idx, categorical_pairs))
 
         return ret
 
@@ -93,7 +99,10 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
 
             categorical_pairs = [(*k, v) for k, v in categorical_pairs.items()]
 
-            ret.append((begin_turn_idx, cursor, categorical_pairs))
+            if self.expand_categorical:
+                ret.extend((begin_turn_idx, cursor, c) for c in categorical_pairs)
+            else:
+                ret.append((begin_turn_idx, cursor, categorical_pairs))
 
             if cursor >= len(dialogue["turns"]) - 2:
                 break
@@ -103,8 +112,9 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
         return ret
 
     def check_data(self, dialogue, other):
-        assert len(other[2]) > 0
-        assert all(service in dialogue["services"] for service, _, _ in other[2])
+        if isinstance(other[2], list):
+            assert len(other[2]) > 0
+            assert all(service in dialogue["services"] for service, _, _ in other[2])
 
     def form_data(self, dialogue, other) -> dict:
         begin_turn_idx, end_turn_idx, categorical_pairs = other
