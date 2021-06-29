@@ -10,13 +10,17 @@ STATE_COLOR = "\x1b[1;38;5;176m"
 class Viewer:
     def __init__(self, data_dir):
         self.dataset = DSTDataset(data_dir)
-        self.id_to_idx = {d["dialogue_id"].upper(): i for i, d in enumerate(self.dataset)}
+        self.id_to_idx = {
+            d["dialogue_id"].upper(): i for i, d in enumerate(self.dataset)
+        }
 
     def print_frame(self, frame):
         print(
             STATE_COLOR,
             f"    {frame['service']:10s} - ",
-            " ; ".join(f"{k}: {v[0]}" for k, v in frame["state"]["slot_values"].items()),
+            " ; ".join(
+                f"{k}: {v[0]}" for k, v in frame["state"]["slot_values"].items()
+            ),
             RESET,
             sep="",
         )
@@ -65,7 +69,7 @@ def main(args):
 def parse_args():
     parser = ArgumentParser()
 
-    parser.add_argument("--data_dir", type=Path, default="dataset/data-0614/train")
+    parser.add_argument("--data_dir", type=Path, default="dataset/data-0625/train")
     parser.add_argument("--schema_json", type=Path, default="dataset/data/schema.json")
 
     return parser.parse_args()
