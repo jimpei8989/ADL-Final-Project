@@ -6,7 +6,9 @@ from datasets.utils import draw_from_list
 
 
 class DSTDatasetForDSTForSpan(DSTDatasetForDST):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, expand_span=False, **kwargs):
+        self.expand_span = expand_span
+
         super().__init__(*args, **kwargs)
 
     def expand1(self, dialogue) -> List[Any]:
@@ -39,7 +41,10 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
                     if k in frame["state"]["slot_values"]
                 )
 
-            ret.append((0, turn_idx, span_pairs))
+            if self.expand_span:
+                ret.append((0, turn_idx, s) for s in span_pairs)
+            else:
+                ret.append((0, turn_idx, span_pairs))
 
         return ret
 
@@ -90,7 +95,10 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
                 (*k, *v) for k, v in span_pairs.items() if v[0] <= cursor - begin_turn_idx
             ]
 
-            ret.append((begin_turn_idx, cursor, span_pairs))
+            if self.expand_span:
+                ret.extend((begin_turn_idx, cursor, s) for s in span_pairs)
+            else:
+                ret.append((begin_turn_idx, cursor, span_pairs))
 
             if cursor >= len(dialogue["turns"]) - 2:
                 break
@@ -100,14 +108,18 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
         return ret
 
     def check_data(self, dialogue, other):
-        assert len(other[2]) > 0
-        assert all(s[0] in dialogue["services"] for s in other[2])
+        if isinstance(other[2], list):
+            assert len(other[2]) > 0
+            assert all(s[0] in dialogue["services"] for s in other[2])
 
     def form_data(self, dialogue, other) -> dict:
         # span_pairs: list of (service, slot, relative turn_idx, start, end)
         begin_turn_idx, end_turn_idx, span_pairs = other
 
-        service_name, slot_name, relative_turn_idx, start, end = draw_from_list(span_pairs)
+        if isinstance(span_pairs, tuple):
+            service_name, slot_name, relative_turn_idx, start, end = span_pairs
+        else:
+            service_name, slot_name, relative_turn_idx, start, end = draw_from_list(span_pairs)
 
         service = self.schema.service_by_name[service_name]
         slot = service.slot_by_name[slot_name]
