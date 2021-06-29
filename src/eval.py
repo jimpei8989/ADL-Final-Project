@@ -11,6 +11,7 @@ def get_args() -> Namespace:
 
     parser.add_argument("--data_dir", "-g", type=Path, required=True)
     parser.add_argument("--pred_file", "-p", type=Path)
+    parser.add_argument("--schema", "-s", type=Path, default="dataset/data/schema.json")
     parser.add_argument("--first_only", action="store_true")
     parser.add_argument("--save_for_view", action="store_true")
 
@@ -69,12 +70,20 @@ def eval(args):
             indent=2,
             sort_keys=True,
         )
+
+    is_categorical = {
+        f"{schema['service_name']}-{slot['name']}".lower()
+        for schema in json.loads(args.schema.read_bytes())
+        for slot in schema["slots"]
+        if slot["is_categorical"]
+    }
     # print(len(labels), len(preds))
     # assert len(labels) == len(preds)
 
     correct = 0
     result_rec = {}
-    missing, surplus, wrong_answer = 0, 0, 0
+    missing, surplus, WA_categorical, WA_span = 0, 0, 0, 0
+    AC_categorical, AC_span = 0, 0
     for dialogue_id in labels:
         if dialogue_id not in preds:
             print(f"dialogue_id {dialogue_id} not appear in prediction")
@@ -89,7 +98,13 @@ def eval(args):
                         "ground truth": labels[dialogue_id][k],
                         "prediction": preds[dialogue_id][k],
                     }
-                    wrong_answer += 1
+                    if k in is_categorical:
+                        WA_categorical += 1
+                    WA_span += 1
+                else:
+                    if k in is_categorical:
+                        AC_categorical += 1
+                    AC_span += 1
             tmp["surplus"] = {
                 k_pred: preds[dialogue_id][k_pred]
                 for k_pred in preds[dialogue_id]
@@ -103,7 +118,10 @@ def eval(args):
                 correct += 1
             result_rec[dialogue_id] = tmp
     print(f"Accuracy = {correct/len(labels)} ; {correct} / {len(labels)}")
-    print(f"missing = {missing}, surplus = {surplus}, wrong answer = {wrong_answer}")
+    print(f"missing = {missing}, surplus = {surplus}")
+    print(
+        f"Categorical correct / wrong = {AC_categorical}, {WA_categorical}; Span correct / wrong = {AC_span}, {WA_span}"
+    )
     if args.save_for_view:
         json.dump(
             result_rec,
