@@ -31,11 +31,13 @@ def load_dst_dataloader(
     for_slot_kwargs: Optional[Dict] = None,
     for_categorical_kwargs: Optional[Dict] = None,
     for_span_kwargs: Optional[Dict] = None,
+    dataset_type: str = None,
 ):
     schema = Schema.load_json(schema_json)
 
+    dataset_table = {}
     logger.info("Loading DSTDatasetForDSTForSlot")
-    slot_dataset = DSTDatasetForDSTForSlot(
+    dataset_table["slot"] = DSTDatasetForDSTForSlot(
         data_dir,
         schema=schema,
         tokenizer=tokenizer,
@@ -44,7 +46,7 @@ def load_dst_dataloader(
     )
 
     logger.info("Loading DSTDatasetForDSTForCategorical")
-    categorical_dataset = DSTDatasetForDSTForCategorical(
+    dataset_table["categorical"] = DSTDatasetForDSTForCategorical(
         data_dir,
         schema=schema,
         tokenizer=tokenizer,
@@ -53,7 +55,7 @@ def load_dst_dataloader(
     )
 
     logger.info("Loading DSTDatasetForDSTForSpan")
-    span_dataset = DSTDatasetForDSTForSpan(
+    dataset_table["span"] = DSTDatasetForDSTForSpan(
         data_dir,
         schema=schema,
         tokenizer=tokenizer,
@@ -62,7 +64,9 @@ def load_dst_dataloader(
     )
 
     dataloaders = [
-        dataloader_cls(dataset) for dataset in [slot_dataset, categorical_dataset, span_dataset]
+        dataloader_cls(dataset)
+        for name, dataset in dataset_table.items()
+        if dataset_type is None or name == dataset_type
     ]
 
     mt_dataloader = MTDataLoader(*dataloaders)

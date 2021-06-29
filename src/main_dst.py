@@ -42,6 +42,7 @@ def parse_args() -> Namespace:
     parser.add_argument("--reserved_for_latter", type=int, default=48)
     parser.add_argument("--overlap_turns", type=int, default=4)
     parser.add_argument("--no_ensure_user_on_both_ends", action="store_true")
+    parser.add_argument("--dataset_type", choices=["slot", "categorical", "span"])
 
     # data loader
     parser.add_argument("--batch_size", type=int, default=8)
@@ -149,6 +150,7 @@ def main(args):
         model=model,
         args=train_args,
         compute_metrics=compute_metrics,
+        dataset_type=args.dataset_type,
     )
     trainer.add_callback(EarlyStoppingCallback(early_stopping_patience=args.early_stopping))
 

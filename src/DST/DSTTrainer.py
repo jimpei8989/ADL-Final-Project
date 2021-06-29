@@ -25,6 +25,7 @@ class DSTTrainer(Trainer):
         for_slot_kwargs: Optional[Dict] = None,
         for_categorical_kwargs: Optional[Dict] = None,
         for_span_kwargs: Optional[Dict] = None,
+        dataset_type: str = None,
         **kwargs,
     ):
         self.train_dataloader = load_dst_dataloader(
@@ -36,6 +37,7 @@ class DSTTrainer(Trainer):
             for_slot_kwargs=for_slot_kwargs,
             for_categorical_kwargs=for_categorical_kwargs,
             for_span_kwargs=for_span_kwargs,
+            dataset_type=dataset_type,
         )
         self.eval_dataloader = load_dst_dataloader(
             data_dir=eval_data_dir,
@@ -46,6 +48,7 @@ class DSTTrainer(Trainer):
             for_slot_kwargs=for_slot_kwargs,
             for_categorical_kwargs=for_categorical_kwargs,
             for_span_kwargs=for_span_kwargs,
+            dataset_type=dataset_type,
         )
 
         kwargs["tokenizer"] = tokenizer
