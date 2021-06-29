@@ -41,6 +41,7 @@ def main(args):
     model = DSTModel.from_pretrained(
         args.pretrained_dir / "pytorch_model.bin",
         model_name=args.model_name_or_path,
+        pool=getattr(train_args, "pool", False),
         device=args.device,
     )
     model.to(args.device)
