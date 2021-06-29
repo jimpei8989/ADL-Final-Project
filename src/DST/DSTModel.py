@@ -16,9 +16,10 @@ class DSTModel(torch.nn.Module):
         cls,
         pretrained_path: Path,
         model_name: str = "bert-base-uncased",
+        pool: bool = False,
         device=torch.device("cpu"),
     ):
-        model = cls(model_name=model_name)
+        model = cls(model_name=model_name, pool=pool)
         model.load_state_dict(torch.load(pretrained_path, map_location=device))
         return model
 
