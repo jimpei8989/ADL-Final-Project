@@ -66,7 +66,7 @@ def load_dst_dataloader(
     dataloaders = [
         dataloader_cls(dataset)
         for name, dataset in dataset_table.items()
-        if dataset_type is None or name == dataset_type
+        if dataset_type is None or name in dataset_type
     ]
 
     mt_dataloader = MTDataLoader(*dataloaders)

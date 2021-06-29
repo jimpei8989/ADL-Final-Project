@@ -42,7 +42,7 @@ def parse_args() -> Namespace:
     parser.add_argument("--reserved_for_latter", type=int, default=48)
     parser.add_argument("--overlap_turns", type=int, default=4)
     parser.add_argument("--no_ensure_user_on_both_ends", action="store_true")
-    parser.add_argument("--dataset_type", choices=["slot", "categorical", "span"])
+    parser.add_argument("--dataset_type", choices=["slot", "categorical", "span"], nargs="+")
 
     # data loader
     parser.add_argument("--batch_size", type=int, default=8)
