@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, List
 
 from torch.utils.data import Dataset, DataLoader, get_worker_info
 from transformers import PreTrainedTokenizerBase, AutoTokenizer
@@ -31,7 +31,7 @@ def load_dst_dataloader(
     for_slot_kwargs: Optional[Dict] = None,
     for_categorical_kwargs: Optional[Dict] = None,
     for_span_kwargs: Optional[Dict] = None,
-    dataset_type: str = None,
+    dataset_type: List = None,
 ):
     schema = Schema.load_json(schema_json)
 
