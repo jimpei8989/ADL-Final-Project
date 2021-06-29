@@ -34,7 +34,9 @@ def eval(args):
             state = defaultdict(str)
             for frame in dialogue["turns"][-2]["frames"]:
                 for k, v in frame["state"]["slot_values"].items():
-                    state[f"{frame['service']}-{k}"] = v[0]
+                    state[f"{frame['service'].lower()}-{k.lower()}"] = (
+                        v[0].replace(",", "_").lower()
+                    )
             labels[dialogue["dialogue_id"]] = dict(state)
 
     if args.save_for_view:
