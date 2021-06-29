@@ -29,6 +29,7 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
 
     def expand1(self, dialogue) -> List[Any]:
         ret = []
+        services = set(dialogue["services"])
 
         turn_indices = (
             [len(dialogue["turns"]) - 2]
@@ -46,7 +47,7 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
             turn = dialogue["turns"][turn_idx]
             assert turn["speaker"] == "USER"
 
-            positive_pairs = set(self.extract_positive_slots(turn).keys())
+            positive_pairs = set(self.extract_positive_slots(turn, services=services).keys())
             negative_pairs = list(all_pairs - positive_pairs)
 
             if self.expand_slot:
@@ -134,7 +135,14 @@ class DSTDatasetForDSTForSlot(DSTDatasetForDST):
         begin_turn_idx, end_turn_idx, positive_pairs, negative_pairs = other
 
         positive = float(random.random() * (1 + self.negative_ratio) < 1.0)
-        service_name, slot_name = draw_from_list(positive_pairs if positive else negative_pairs)
+        if positive:
+            service_name, slot_name = (
+                positive_pairs
+                if isinstance(positive_pairs, tuple)
+                else draw_from_list(positive_pairs)
+            )
+        else:
+            service_name, slot_name = draw_from_list(negative_pairs)
 
         service = self.schema.service_by_name[service_name]
         slot = service.slot_by_name[slot_name]
