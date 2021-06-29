@@ -71,13 +71,44 @@ def eval(args):
     # assert len(labels) == len(preds)
 
     correct = 0
+    result_rec = {}
+    missing, surplus, wrong_answer = 0, 0, 0
     for dialogue_id in labels:
-        if (
-            len(labels[dialogue_id]) == len(preds[dialogue_id])
-            and labels[dialogue_id] == preds[dialogue_id]
-        ):
-            correct += 1
+        if dialogue_id not in preds:
+            print(f"dialogue_id {dialogue_id} not appear in prediction")
+        else:
+            tmp = defaultdict(dict)
+            for k in labels[dialogue_id]:
+                if k not in preds[dialogue_id]:
+                    tmp["missing"][k] = labels[dialogue_id][k]
+                    missing += 1
+                elif labels[dialogue_id][k] != preds[dialogue_id][k]:
+                    tmp["WA"][k] = {
+                        "ground truth": labels[dialogue_id][k],
+                        "prediction": preds[dialogue_id][k],
+                    }
+                    wrong_answer += 1
+            tmp["surplus"] = {
+                k_pred: preds[dialogue_id][k_pred]
+                for k_pred in preds[dialogue_id]
+                if k_pred not in labels[dialogue_id]
+            }
+
+            surplus += len(tmp["surplus"])
+            if len(tmp["surplus"]) == 0:
+                del tmp["surplus"]
+            if len(tmp) == 0:
+                correct += 1
+            result_rec[dialogue_id] = tmp
     print(f"Accuracy = {correct/len(labels)} ; {correct} / {len(labels)}")
+    print(f"missing = {missing}, surplus = {surplus}, wrong answer = {wrong_answer}")
+    if args.save_for_view:
+        json.dump(
+            result_rec,
+            Path("forview/difference.json").open("w"),
+            indent=2,
+            sort_keys=True,
+        )
 
 
 if __name__ == "__main__":
