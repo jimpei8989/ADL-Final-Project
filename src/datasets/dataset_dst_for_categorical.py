@@ -120,7 +120,12 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
         begin_turn_idx, end_turn_idx, categorical_pairs = other
 
         positive = float(random.random() * (1 + self.negative_ratio) < 1.0)
-        service_name, slot_name, correct = draw_from_list(categorical_pairs)
+
+        if isinstance(categorical_pairs, tuple):
+            service_name, slot_name, correct = categorical_pairs
+        else:
+            service_name, slot_name, correct = draw_from_list(categorical_pairs)
+
         service = self.schema.service_by_name[service_name]
         slot = service.slot_by_name[slot_name]
 
