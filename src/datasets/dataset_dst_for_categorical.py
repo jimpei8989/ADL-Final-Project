@@ -12,16 +12,19 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
         self,
         *args,
         negative_ratio=1.0,
+        expand_categorical=False,
         **kwargs,
     ):
         self.negative_ratio = negative_ratio
+        self.expand_categorical = expand_categorical
 
         super().__init__(*args, **kwargs)
 
-    def extract_categorical_pairs(self, turn):
+    def extract_categorical_pairs(self, turn, services=None):
         return {
             (frame["service"], slot): frame["state"]["slot_values"][slot][0]
             for frame in turn["frames"]
+            if services is None or frame["service"] in services
             for slot in frame["state"]["slot_values"]
             if self.schema.service_by_name[frame["service"]].slot_by_name[slot].is_categorical
         }
@@ -40,13 +43,17 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
             assert turn["speaker"] == "USER"
 
             categorical_pairs = [(*k, v) for k, v in self.extract_categorical_pairs(turn).items()]
-            ret.append((0, turn_idx, categorical_pairs))
+
+            if self.expand_categorical:
+                ret.extend((0, turn_idx, c) for c in categorical_pairs)
+            else:
+                ret.append((0, turn_idx, categorical_pairs))
 
         return ret
 
     def expand2(self, dialogue) -> List[Any]:
         ret = []
-        turns = dialogue["turns"]
+        turns, services = dialogue["turns"], set(dialogue["services"])
         begin_turn_idx = 0
 
         while True:
@@ -62,7 +69,7 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
                     if turns[begin_turn_idx - 1]["speaker"] == "USER"
                     else turns[begin_turn_idx - 2]
                 )
-                before = self.extract_categorical_pairs(user_before_begin)
+                before = self.extract_categorical_pairs(user_before_begin, services=services)
             else:
                 before = {}
 
@@ -85,7 +92,7 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
             last_user_turn = (
                 turns[cursor] if turns[cursor]["speaker"] == "USER" else turns[cursor - 1]
             )
-            categorical_pairs = self.extract_categorical_pairs(last_user_turn)
+            categorical_pairs = self.extract_categorical_pairs(last_user_turn, services=services)
 
             for k in before:
                 if k in categorical_pairs and categorical_pairs[k] == before[k]:
@@ -93,7 +100,10 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
 
             categorical_pairs = [(*k, v) for k, v in categorical_pairs.items()]
 
-            ret.append((begin_turn_idx, cursor, categorical_pairs))
+            if self.expand_categorical:
+                ret.extend((begin_turn_idx, cursor, c) for c in categorical_pairs)
+            else:
+                ret.append((begin_turn_idx, cursor, categorical_pairs))
 
             if cursor >= len(dialogue["turns"]) - 2:
                 break
@@ -103,14 +113,19 @@ class DSTDatasetForDSTForCategorical(DSTDatasetForDST):
         return ret
 
     def check_data(self, dialogue, other):
-        assert len(other[2]) > 0
-        assert all(service in dialogue["services"] for service, _, _ in other[2])
+        if isinstance(other[2], list):
+            assert len(other[2]) > 0
 
     def form_data(self, dialogue, other) -> dict:
         begin_turn_idx, end_turn_idx, categorical_pairs = other
 
         positive = float(random.random() * (1 + self.negative_ratio) < 1.0)
-        service_name, slot_name, correct = draw_from_list(categorical_pairs)
+
+        if isinstance(categorical_pairs, tuple):
+            service_name, slot_name, correct = categorical_pairs
+        else:
+            service_name, slot_name, correct = draw_from_list(categorical_pairs)
+
         service = self.schema.service_by_name[service_name]
         slot = service.slot_by_name[slot_name]
 

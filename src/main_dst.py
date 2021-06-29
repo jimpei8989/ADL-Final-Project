@@ -42,6 +42,9 @@ def parse_args() -> Namespace:
     parser.add_argument("--reserved_for_latter", type=int, default=48)
     parser.add_argument("--overlap_turns", type=int, default=4)
     parser.add_argument("--no_ensure_user_on_both_ends", action="store_true")
+    parser.add_argument("--no_expand_slot", dest="expand_slot", action="store_false")
+    parser.add_argument("--no_expand_categorical", dest="expand_categorical", action="store_false")
+    parser.add_argument("--no_expand_span", dest="expand_span", action="store_false")
     parser.add_argument("--dataset_type", choices=["slot", "categorical", "span"], nargs="+")
 
     # data loader
@@ -147,6 +150,9 @@ def main(args):
         train_dataloader_cls=dataloader_cls.to_train_dataloader,
         eval_dataloader_cls=dataloader_cls.to_eval_dataloader,
         dataset_kwargs=dataset_kwargs,
+        for_slot_kwargs={"expand_slot": args.expand_slot},
+        for_categorical_kwargs={"expand_categorical": args.expand_categorical},
+        for_span_kwargs={"expand_span": args.expand_span},
         model=model,
         args=train_args,
         compute_metrics=compute_metrics,

@@ -6,7 +6,9 @@ from datasets.utils import draw_from_list
 
 
 class DSTDatasetForDSTForSpan(DSTDatasetForDST):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, expand_span=False, **kwargs):
+        self.expand_span = expand_span
+
         super().__init__(*args, **kwargs)
 
     def expand1(self, dialogue) -> List[Any]:
@@ -39,13 +41,16 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
                     if k in frame["state"]["slot_values"]
                 )
 
-            ret.append((0, turn_idx, span_pairs))
+            if self.expand_span:
+                ret.append((0, turn_idx, s) for s in span_pairs)
+            else:
+                ret.append((0, turn_idx, span_pairs))
 
         return ret
 
     def expand2(self, dialogue):
         ret = []
-        turns = dialogue["turns"]
+        turns, services = dialogue["turns"], set(dialogue["services"])
         begin_turn_idx = 0
 
         while True:
@@ -54,7 +59,6 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
 
             cursor = begin_turn_idx
             cur_token_cnt = 0
-            span_pairs = {}
 
             while cursor < len(turns):
                 turn = turns[cursor]
@@ -64,19 +68,6 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
                 if cur_token_cnt + turn_token_len > self.former_max_len:
                     break
                 else:
-                    if turn["speaker"] == "USER":
-                        for frame in turn["frames"]:
-                            service = frame["service"]
-
-                            for s in filter(
-                                lambda s: "start" in s and "exclusive_end" in s, frame["slots"]
-                            ):
-                                span_pairs[(service, s["slot"])] = (
-                                    cursor - begin_turn_idx,
-                                    s["start"],
-                                    s["exclusive_end"],
-                                )
-
                     cursor += 1
                     cur_token_cnt += turn_token_len
             # Always -1 to make it right-close
@@ -86,11 +77,39 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
                 if cursor % 2 == 1:
                     cursor -= 1
 
-            span_pairs = [
-                (*k, *v) for k, v in span_pairs.items() if v[0] <= cursor - begin_turn_idx
-            ]
+            span_pairs = {}
+            for turn_idx in range(begin_turn_idx, cursor + 1):
+                turn = turns[turn_idx]
+                for frame in turn["frames"]:
+                    service = frame["service"]
 
-            ret.append((begin_turn_idx, cursor, span_pairs))
+                    if service not in services:
+                        continue
+
+                    for s in filter(
+                        lambda s: "start" in s and "exclusive_end" in s, frame["slots"]
+                    ):
+                        span_pairs[(service, s["slot"])] = (
+                            turn_idx - begin_turn_idx,
+                            s["start"],
+                            s["exclusive_end"],
+                        )
+
+            last_user_turn = (
+                turns[cursor] if turns[cursor]["speaker"] == "USER" else turns[cursor - 1]
+            )
+            last_user_turn_states = set(
+                (frame["service"], slot)
+                for frame in last_user_turn["frames"]
+                for slot in frame["state"]["slot_values"]
+            )
+
+            span_pairs = [(*k, *v) for k, v in span_pairs.items() if k in last_user_turn_states]
+
+            if self.expand_span:
+                ret.extend((begin_turn_idx, cursor, s) for s in span_pairs)
+            else:
+                ret.append((begin_turn_idx, cursor, span_pairs))
 
             if cursor >= len(dialogue["turns"]) - 2:
                 break
@@ -100,14 +119,18 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
         return ret
 
     def check_data(self, dialogue, other):
-        assert len(other[2]) > 0
-        assert all(s[0] in dialogue["services"] for s in other[2])
+        if isinstance(other[2], list):
+            assert len(other[2]) > 0
+            assert all(s[0] in dialogue["services"] for s in other[2])
 
     def form_data(self, dialogue, other) -> dict:
         # span_pairs: list of (service, slot, relative turn_idx, start, end)
         begin_turn_idx, end_turn_idx, span_pairs = other
 
-        service_name, slot_name, relative_turn_idx, start, end = draw_from_list(span_pairs)
+        if isinstance(span_pairs, tuple):
+            service_name, slot_name, relative_turn_idx, start, end = span_pairs
+        else:
+            service_name, slot_name, relative_turn_idx, start, end = draw_from_list(span_pairs)
 
         service = self.schema.service_by_name[service_name]
         slot = service.slot_by_name[slot_name]
