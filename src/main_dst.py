@@ -46,6 +46,7 @@ def parse_args() -> Namespace:
     parser.add_argument("--no_expand_categorical", dest="expand_categorical", action="store_false")
     parser.add_argument("--no_expand_span", dest="expand_span", action="store_false")
     parser.add_argument("--dataset_type", choices=["slot", "categorical", "span"], nargs="+")
+    parser.add_argument("--dataset_weights", nargs=3, default=[1, 1, 1], type=int)
 
     # data loader
     parser.add_argument("--batch_size", type=int, default=8)
@@ -157,6 +158,7 @@ def main(args):
         args=train_args,
         compute_metrics=compute_metrics,
         dataset_type=args.dataset_type,
+        dataset_weights=args.dataset_weights,
     )
     trainer.add_callback(EarlyStoppingCallback(early_stopping_patience=args.early_stopping))
 

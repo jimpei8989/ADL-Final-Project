@@ -2,6 +2,8 @@ import random
 from itertools import chain
 from typing import List, Optional
 
+from utils.logger import logger
+
 
 class MTDataLoader:
     """
@@ -15,6 +17,10 @@ class MTDataLoader:
         self.dataset = [None] * sum(len(dataloader.dataset) for dataloader in self.dataloaders)
         self.iterator_indices = sum(
             ([i] * len(a) * w for i, (a, w) in enumerate(zip(self.dataloaders, self.weights))), []
+        )
+
+        logger.info(
+            f"Multi-task Dataloader loaded with weights: {':'.join(map(str, self.weights))}"
         )
 
     def __len__(self):
