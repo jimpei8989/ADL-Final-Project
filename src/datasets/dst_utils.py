@@ -32,6 +32,7 @@ def load_dst_dataloader(
     for_categorical_kwargs: Optional[Dict] = None,
     for_span_kwargs: Optional[Dict] = None,
     dataset_type: List = None,
+    dataset_weights: List[int] = (1, 1, 1),
 ):
     schema = Schema.load_json(schema_json)
 
@@ -69,7 +70,7 @@ def load_dst_dataloader(
         if dataset_type is None or name in dataset_type
     ]
 
-    mt_dataloader = MTDataLoader(*dataloaders)
+    mt_dataloader = MTDataLoader(*dataloaders, weights=dataset_weights)
 
     return mt_dataloader
 
