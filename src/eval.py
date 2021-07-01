@@ -84,6 +84,7 @@ def eval(args):
     result_rec = {}
     missing, surplus, WA_categorical, WA_span = 0, 0, 0, 0
     AC_categorical, AC_span = 0, 0
+    slot_TP, slot_FP, slot_FN = 0, 0, 0
     for dialogue_id in labels:
         if dialogue_id not in preds:
             print(f"dialogue_id {dialogue_id} not appear in prediction")
@@ -93,6 +94,7 @@ def eval(args):
                 if k not in preds[dialogue_id]:
                     tmp["missing"][k] = labels[dialogue_id][k]
                     missing += 1
+                    slot_FN += 1
                 elif labels[dialogue_id][k] != preds[dialogue_id][k]:
                     tmp["WA"][k] = {
                         "ground truth": labels[dialogue_id][k],
@@ -101,10 +103,12 @@ def eval(args):
                     if k in is_categorical:
                         WA_categorical += 1
                     WA_span += 1
+                    slot_TP += 1
                 else:
                     if k in is_categorical:
                         AC_categorical += 1
                     AC_span += 1
+                    slot_TP += 1
             tmp["surplus"] = {
                 k_pred: preds[dialogue_id][k_pred]
                 for k_pred in preds[dialogue_id]
@@ -112,6 +116,7 @@ def eval(args):
             }
 
             surplus += len(tmp["surplus"])
+            slot_FP += len(tmp["surplus"])
             if len(tmp["surplus"]) == 0:
                 del tmp["surplus"]
             if len(tmp) == 0:
@@ -121,6 +126,9 @@ def eval(args):
     print(f"missing = {missing}, surplus = {surplus}")
     print(
         f"Categorical correct / wrong = {AC_categorical}, {WA_categorical}; Span correct / wrong = {AC_span}, {WA_span}"
+    )
+    print(
+        f"Slot precision = {slot_TP / (slot_TP + slot_FP)}, recall = {slot_TP / (slot_TP + slot_FN)}"
     )
     if args.save_for_view:
         json.dump(
