@@ -32,6 +32,7 @@ def parse_args() -> Namespace:
     parser.add_argument("--ckpt_dir", type=Path, default="./ckpt/DST/default/")
 
     # optimizer
+    parser.add_argument("--lr", type=float, default=5e-5)
     parser.add_argument("--weight_decay", type=float, default=1e-6)
 
     # dataset
@@ -55,6 +56,9 @@ def parse_args() -> Namespace:
     # training
     parser.add_argument("--model_name_or_path", default="models/convbert-dg")
     parser.add_argument("--pool", action="store_true", default=False)
+    parser.add_argument("--slot_weight", type=float, default=1.0)
+    parser.add_argument("--categorical_weight", type=float, default=1.0)
+    parser.add_argument("--span_weight", type=float, default=1.0)
     parser.add_argument("--accumulate_steps", type=int, default=16)
     parser.add_argument("--no_adafactor", action="store_true", default=False)
     parser.add_argument("--no_fp16", action="store_true", default=False)
@@ -115,11 +119,18 @@ def main(args):
     save_args(args)
     set_seed(args.seed)
 
-    model = DSTModel(model_name=args.model_name_or_path, pool=args.pool)
+    model = DSTModel(
+        model_name=args.model_name_or_path,
+        pool=args.pool,
+        slot_weight=args.slot_weight,
+        value_weight=args.categorical_weight,
+        span_weight=args.span_weight,
+    )
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     train_args = TrainingArguments(
         args.ckpt_dir,
+        learning_rate=args.lr,
         weight_decay=args.weight_decay,
         evaluation_strategy="epoch",
         logging_strategy="epoch",

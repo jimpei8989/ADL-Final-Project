@@ -28,6 +28,9 @@ class DSTModel(torch.nn.Module):
         model_name: str = None,
         config: str = None,
         pool: bool = False,
+        slot_weight: float = 1.0,
+        value_weight: float = 1.0,
+        span_weight: float = 1.0,
     ) -> None:
         super(DSTModel, self).__init__()
         if model_name is not None:
@@ -40,6 +43,9 @@ class DSTModel(torch.nn.Module):
         self.pool = pool
         self.hidden_size = self.backbone.config.hidden_size
         self.max_position_embeddings = self.backbone.config.max_position_embeddings
+        self.slot_weight = slot_weight
+        self.value_weight = value_weight
+        self.span_weight = span_weight
 
         self.cls_fc = Linear(self.hidden_size, 2)
         self.span_fc = Linear(self.hidden_size, 2)
@@ -78,15 +84,15 @@ class DSTModel(torch.nn.Module):
 
         if slot_labels is not None:
             slot_loss = self.cls_criterion(slot_logits, slot_labels)
-            total_loss += slot_loss
+            total_loss += slot_loss * self.slot_weight
         if value_labels is not None:
             value_loss = self.cls_criterion(value_logits, value_labels)
-            total_loss += value_loss
+            total_loss += value_loss * self.value_weight
         if begin_labels is not None and end_labels is not None:
             begin_loss = self.span_criterion(begin_logits, begin_labels)
             end_loss = self.span_criterion(end_logits, end_labels)
             span_loss = (begin_loss + end_loss) / 2
-            total_loss += span_loss
+            total_loss += span_loss * self.span_weight
 
         return DSTModelOutput(
             loss=total_loss,
