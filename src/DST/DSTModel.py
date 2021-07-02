@@ -49,7 +49,6 @@ class DSTModel(torch.nn.Module):
 
         self.cls_fc = Linear(self.hidden_size, 2)
         self.span_fc = Linear(self.hidden_size, 2)
-        self.pooler = Sequential(Linear(self.hidden_size, self.hidden_size), Tanh())
 
         self.cls_criterion = BCEWithLogitsLoss()
         self.span_criterion = CrossEntropyLoss()
@@ -67,7 +66,7 @@ class DSTModel(torch.nn.Module):
 
         cls_logits = (
             self.cls_fc(self.pooler(last_hidden_states[:, 0]))
-            if self.pool
+            if self.pool and self.pooler is not None
             else self.cls_fc(last_hidden_states[:, 0])
         )
         slot_logits = cls_logits[:, 0]
