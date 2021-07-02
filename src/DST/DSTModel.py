@@ -65,8 +65,10 @@ class DSTModel(torch.nn.Module):
         last_hidden_states = self.backbone(input_ids)["last_hidden_state"]
 
         cls_logits = (
-            self.cls_fc(self.pooler(last_hidden_states[:, 0]))
-            if self.pool and self.pooler is not None
+            self.cls_fc(self.backbone.pooler(last_hidden_states[:, 0]))
+            if self.pool
+            and getattr(self.backbone, "pooler", False)
+            and self.backbone.pooler is not None
             else self.cls_fc(last_hidden_states[:, 0])
         )
         slot_logits = cls_logits[:, 0]
