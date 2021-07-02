@@ -100,7 +100,7 @@ def main(args):
                                 for i in range(begin_scores.shape[0])
                                 if encoded.token_to_sequence(i) == 0
                                 for j in range(
-                                    i, max(i + args.max_span_length, begin_scores.shape[0])
+                                    i, min(i + args.max_span_length, begin_scores.shape[0])
                                 )
                                 if encoded.token_to_sequence(j) == 0
                             ),
