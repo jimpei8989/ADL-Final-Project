@@ -1,6 +1,6 @@
 import os
 from argparse import ArgumentParser, Namespace
-from collections import defaultdict
+from collections import defaultdict, Counter
 from pathlib import Path
 
 import pandas as pd
@@ -77,6 +77,8 @@ def main(args):
     states = defaultdict(lambda: defaultdict(dict))  # (dialogue_id, turn_idx) -> slot : value
     dialogue_to_others = defaultdict(list)
 
+    span_lengthes = Counter()
+
     with torch.no_grad():
         for batch in tqdm(slot_dataloader, ncols=99, desc="Predicting slots"):
             batch_output = model(batch["input_ids"].to(args.device))
@@ -91,54 +93,26 @@ def main(args):
                     else:
                         begin_scores = output.begin_logits.softmax(dim=0)
                         end_scores = output.end_logits.softmax(dim=0)
-                        begin_token_idx = begin_scores.argmax()
-                        end_token_idx = end_scores.argmax()
 
-                        _begin_logits = begin_scores.clone()
-                        _begin_logits[end_token_idx + 1 :] = 0
-                        _begin_logits[: end_token_idx - args.max_span_length + 1] = 0
-                        _begin_token_idx = _begin_logits.argmax()
-
-                        _end_logits = end_scores.clone()
-                        _end_logits[begin_token_idx + args.max_span_length :] = 0
-                        _end_logits[:begin_token_idx] = 0
-                        _end_token_idx = _end_logits.argmax()
-
-                        # Pair 1: begin_idx, _end_index
-                        score_1 = (
-                            begin_scores[begin_token_idx] * end_scores[_end_token_idx]
-                            if (
-                                encoded.token_to_sequence(begin_token_idx) == 0
-                                and encoded.token_to_sequence(_end_token_idx) == 0
-                            )
-                            else 0
+                        begin_token_idx, end_token_idx = max(
+                            (
+                                (i, j)
+                                for i in range(begin_scores.shape[0])
+                                if encoded.token_to_sequence(i) == 0
+                                for j in range(
+                                    i, max(i + args.max_span_length, begin_scores.shape[0])
+                                )
+                                if encoded.token_to_sequence(j) == 0
+                            ),
+                            key=lambda p: begin_scores[p[0]] * end_scores[p[1]],
                         )
+                        span_lengthes.update([end_token_idx - begin_token_idx + 1])
 
-                        # Pair 2: _begin_idx, end_idx
-                        score_2 = (
-                            begin_scores[_begin_token_idx] * end_scores[end_token_idx]
-                            if (
-                                encoded.token_to_sequence(_begin_token_idx) == 0
-                                and encoded.token_to_sequence(end_token_idx) == 0
-                            )
-                            else 0
-                        )
-
-                        if score_1 == 0 and score_2 == 0:
-                            pass
-                        else:
-                            if score_1 > score_2:
-                                begin_char_idx = encoded.token_to_chars(begin_token_idx).start
-                                end_char_idx = encoded.token_to_chars(_end_token_idx).end
-                            else:
-                                begin_char_idx = encoded.token_to_chars(_begin_token_idx).start
-                                end_char_idx = encoded.token_to_chars(end_token_idx).end
-
-                            value = batch["utterance"][i][begin_char_idx : end_char_idx + 1].strip(
-                                STRIP_CHARS
-                            )
-
-                            states[key[0]][key[2]][f"{key[3]}-{key[4]}"] = value
+                        begin_char_idx = encoded.token_to_chars(begin_token_idx).start
+                        end_char_idx = encoded.token_to_chars(end_token_idx).end
+                        states[key[0]][key[2]][f"{key[3]}-{key[4]}"] = batch["utterance"][i][
+                            begin_char_idx : end_char_idx + 1
+                        ].strip(STRIP_CHARS)
 
     if args.test_mode:
         print(dialogue_to_others)
