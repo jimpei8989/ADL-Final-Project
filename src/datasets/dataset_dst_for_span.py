@@ -42,7 +42,7 @@ class DSTDatasetForDSTForSpan(DSTDatasetForDST):
                 )
 
             if self.expand_span:
-                ret.append((0, turn_idx, s) for s in span_pairs)
+                ret.extend((0, turn_idx, s) for s in span_pairs)
             else:
                 ret.append((0, turn_idx, span_pairs))
 
