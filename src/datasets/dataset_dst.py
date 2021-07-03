@@ -147,6 +147,7 @@ class DSTDatasetForDST(DSTDataset):
         #     max_length -= 10
 
         utterances = self.form_utterances(turns, max_length=max_length - latter_token_len - 3)
+        relative_turn_idx = relative_turn_idx - (len(turns) - len(utterances))
 
         if begin_str_idx is not None and end_str_idx is not None:
             offset = sum(len(u) + 1 for u in utterances[:relative_turn_idx])
