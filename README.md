@@ -14,6 +14,17 @@
 - [Trippy](https://gitlab.cs.uni-duesseldorf.de/general/dsml/trippy-public)
 - [Dialoglue](https://github.com/alexa/dialoglue)
 
+## For TAs to reproduce our result
+1. Download the model weights:
+    ```bash
+    bash download-model.sh
+    ```
+2. Run the prediction script by
+    ```bash
+    bash run.sh ${SCHEMA_JSON} ${TEST_DATA_DIR} ${PREDICTION_CSV}
+    ```
+
+## Notes
 ### How to run
 Note: run `download-data.sh` first to get the dataset
 
