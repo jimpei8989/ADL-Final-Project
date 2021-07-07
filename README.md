@@ -25,7 +25,7 @@ aws s3 cp s3://dialoglue/ models/ --no-sign-request --recursive
 
 ##### Train & Predict
 ```
-python src/predict_dst.py --pretrained_dir [model_dir] --model_name_or_path [pretrained_wight] --train_args_path [training_argument].json --gpu_id [gpu_id] --test_data_dir [data_directory]
+python src/predict_dst.py --pretrained_dir [model_dir] --model_name_or_path [pretrained_wight] --train_args_path [training_argument].json --gpu_id [gpu_id] --test_data_dir [data_directory] --max_span_length 16
 ```
 
 #### NLG
