@@ -14,14 +14,27 @@
 - [Trippy](https://gitlab.cs.uni-duesseldorf.de/general/dsml/trippy-public)
 - [Dialoglue](https://github.com/alexa/dialoglue)
 
-### How to run - NLG
+### How to run
 Note: run `download-data.sh` first to get the dataset
-#### Use pretrained model (BlenderBot)
+
+#### DST
+##### Download Dialoglue pretrained weight
+```
+aws s3 cp s3://dialoglue/ models/ --no-sign-request --recursive
+```
+
+##### Train & Predict
+```
+python src/predict_dst.py --pretrained_dir [model_dir] --model_name_or_path [pretrained_wight] --train_args_path [training_argument].json --gpu_id [gpu_id] --test_data_dir [data_directory]
+```
+
+#### NLG
+##### Use pretrained model (BlenderBot)
 ```
 python src/main_nlg.py --predict --test_data [test_data_path] --opt_file [opt_file_path]
 ```
 
-#### Train on DST dataset
+##### Train on DST dataset
 + Train & predict begin chit-chat:
     ```
     python src/main_nlg.py --train_begin --pretrained t5-base --ckpt_dir [model_dir]
@@ -33,7 +46,7 @@ python src/main_nlg.py --predict --test_data [test_data_path] --opt_file [opt_fi
     python src/main_nlg.py --predict_end --ckpt_dir [model_dir] --test_data [test_data_path] --opt_file [opt_file_path]
     ```
 
-#### Filtering
+##### Filtering
 ```
 python src/postprocess.py -b [begin_chit-chat_file_path] -e [begin_chit-chat_file_path] -o [opt_json_path]
 ```
